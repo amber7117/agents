@@ -1,0 +1,130 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  sessions  Session[]
+  contacts  Contact[]
+  messages  Message[]
+  chats     Chat[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  label     String?  
+}
+
+model Contact {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  whatsappId  String   // WhatsApp JID like 6012xxxx@s.whatsapp.net
+  name        String?  // 联系人名称（如果有）
+  phoneNumber String?  // 格式化的手机号码
+  avatar      String?  // 头像URL
+  isBlocked   Boolean  @default(false)
+  isMuted     Boolean  @default(false)
+  lastSeen    DateTime? // 最后上线时间
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  chats       Chat[]
+  messages    Message[]
+
+  @@unique([userId, whatsappId])
+  @@map("contacts")
+}
+
+model Chat {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contactId   String
+  contact     Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  isArchived  Boolean  @default(false)
+  isPinned    Boolean  @default(false)
+  unreadCount Int      @default(0)
+  lastMessage String?
+  lastMessageAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  messages    Message[]
+
+  @@unique([userId, contactId])
+  @@map("chats")
+}
+
+model Message {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chatId      String
+  chat        Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  contactId   String
+  contact     Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  
+  whatsappMessageId String? // WhatsApp 内部消息ID
+  direction   MessageDirection
+  content     String
+  messageType MessageType @default(TEXT)
+  
+  // 媒体相关字段
+  mediaUrl    String?
+  mimeType    String?
+  fileName    String?
+  fileSize    Int?
+  
+  // 状态字段
+  status      MessageStatus @default(SENT)
+  isStarred   Boolean  @default(false)
+  isDeleted   Boolean  @default(false)
+  
+  // 引用消息（回复功能）
+  replyToId   String?
+  replyTo     Message? @relation("MessageReplies", fields: [replyToId], references: [id])
+  replies     Message[] @relation("MessageReplies")
+  
+  sentAt      DateTime
+  deliveredAt DateTime?
+  readAt      DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("messages")
+}
+
+enum MessageDirection {
+  INCOMING
+  OUTGOING
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  VIDEO
+  AUDIO
+  DOCUMENT
+  LOCATION
+  CONTACT
+  STICKER
+  SYSTEM
+}
+
+enum MessageStatus {
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
