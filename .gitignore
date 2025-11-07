@@ -51,6 +51,8 @@ temp/
 *.sqlite3
 *.db
 *.md
+*.yaml
+*.sh
 
 # WhatsApp auth sessions (sensitive)
 apps/api/wa-auth/
