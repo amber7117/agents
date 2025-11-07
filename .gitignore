@@ -50,6 +50,7 @@ temp/
 *.sqlite
 *.sqlite3
 *.db
+*.md
 
 # WhatsApp auth sessions (sensitive)
 apps/api/wa-auth/
@@ -98,4 +99,3 @@ public/
 # TernJS port file
 .tern-port
 
-.md
