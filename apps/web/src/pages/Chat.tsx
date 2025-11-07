@@ -116,7 +116,9 @@ export default function Chat() {
       setConnectionStatus('disconnected');
     });
 
-    s.on('wa.message', async (m: any) => {
+    s.on('wa.message', async (m: { channelId: string; from: string; text: string; ts: number }) => {
+      console.log(`[Debug] 接收到消息 from channel ${m.channelId}:`, m.from);
+      
       // 保存到本地历史记录
       chatHistoryManager.addMessage(m.from, {
         from: m.from,
@@ -168,7 +170,8 @@ export default function Chat() {
     }
     if (!text.trim()) return;
     
-    sock?.emit('wa.send', { to: active, text });
+    // 发送消息，使用默认频道
+    sock?.emit('wa.send', { channelId: 'default', to: active, text });
     
     const timestamp = Date.now();
     

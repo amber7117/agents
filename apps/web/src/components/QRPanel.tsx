@@ -10,6 +10,7 @@ export default function QRPanel() {
   const [isRetrying, setIsRetrying] = useState(false);
   const [debugInfo, setDebugInfo] = useState<string[]>([]);
   const [qrData, setQrData] = useState<string>('');
+  const socketRef = useRef<Socket | null>(null);
 
   const addDebugInfo = (info: string) => {
     console.log(info);
@@ -27,6 +28,7 @@ export default function QRPanel() {
 
     addDebugInfo('🔌 Connecting to server...');
     sock = io(API_URL, { auth: { token } });
+    socketRef.current = sock;
 
     sock.on('connect', () => {
       setStatus('connecting');
@@ -64,6 +66,11 @@ export default function QRPanel() {
       addDebugInfo('✅ WhatsApp connected');
     });
 
+    sock.on('wa.stopped', () => {
+      setStatus('waiting');
+      addDebugInfo('✅ WhatsApp disconnected successfully');
+    });
+
     sock.on('disconnect', () => {
       setStatus('waiting');
       setIsRetrying(true);
@@ -79,6 +86,7 @@ export default function QRPanel() {
         addDebugInfo('🔌 Disconnecting...');
         sock.close();
       }
+      socketRef.current = null;
     };
   }, []);
 
@@ -106,6 +114,13 @@ export default function QRPanel() {
       case 'scanning': return '📱';
       case 'connecting': return '🔄';
       default: return '⏳';
+    }
+  };
+
+  const handleDisconnect = () => {
+    if (socketRef.current && status === 'ready') {
+      addDebugInfo('🔌 Requesting disconnect...');
+      socketRef.current.emit('wa.stop');
     }
   };
 
@@ -237,10 +252,37 @@ export default function QRPanel() {
           <p style={{
             color: '#b3b3b3',
             fontSize: '14px',
-            margin: 0
+            margin: '0 0 20px'
           }}>
             您的 WhatsApp 已成功连接到业务桌面
           </p>
+          
+          {/* 断开连接按钮 */}
+          <button
+            className="btn btn-secondary"
+            onClick={handleDisconnect}
+            style={{
+              background: 'linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%)',
+              border: 'none',
+              padding: '12px 24px',
+              fontSize: '14px',
+              fontWeight: '600',
+              color: '#ffffff',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease',
+              boxShadow: '0 4px 12px rgba(255, 107, 107, 0.3)'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.boxShadow = '0 6px 16px rgba(255, 107, 107, 0.4)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(255, 107, 107, 0.3)';
+            }}
+          >
+            🔌 断开 WhatsApp
+          </button>
         </div>
       )}
 

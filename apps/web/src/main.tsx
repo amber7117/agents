@@ -6,7 +6,9 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Chat from './pages/Chat';
+import Channels from './pages/Channels';
 import Settings from './pages/Settings';
+import AISettings from './pages/AISettings';
 
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
@@ -18,7 +20,9 @@ createRoot(document.getElementById('root')!).render(
           <Route path="register" element={<Register />} />
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="chat" element={<Chat />} />
+          <Route path="channels" element={<Channels />} />
           <Route path="settings" element={<Settings />} />
+          <Route path="ai" element={<AISettings />} />
         </Route>
       </Routes>
     </BrowserRouter>

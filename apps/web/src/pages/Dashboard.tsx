@@ -1,4 +1,3 @@
-import QRPanel from '../components/QRPanel';
 import { tokenStore } from '../store';
 import { useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
@@ -123,9 +122,79 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* QR码连接卡片 */}
-      <div className="card">
-        <QRPanel />
+      {/* 频道管理卡片 */}
+      <div 
+        className="card"
+        onClick={() => nav('/channels')}
+        style={{ cursor: 'pointer', transition: 'all 0.3s ease' }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.transform = 'translateY(-4px)';
+          e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.15)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = 'translateY(0)';
+          e.currentTarget.style.boxShadow = '';
+        }}
+      >
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '16px',
+          marginBottom: '20px'
+        }}>
+          <div style={{
+            width: '56px',
+            height: '56px',
+            borderRadius: '12px',
+            background: 'linear-gradient(135deg, #25D366 0%, #128C7E 100%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '28px'
+          }}>
+            📱
+          </div>
+          <div>
+            <h3 style={{ margin: '0 0 4px 0', fontSize: '20px' }}>频道管理</h3>
+            <p style={{ margin: 0, color: '#666', fontSize: '14px' }}>
+              管理您的 WhatsApp 账号连接
+            </p>
+          </div>
+        </div>
+        
+        <div style={{
+          padding: '16px',
+          background: '#f8f9fa',
+          borderRadius: '8px',
+          marginBottom: '16px'
+        }}>
+          <p style={{ margin: '0 0 12px 0', color: '#333' }}>
+            在频道页面，您可以：
+          </p>
+          <ul style={{ 
+            margin: 0, 
+            paddingLeft: '20px',
+            color: '#666',
+            fontSize: '14px',
+            lineHeight: '1.8'
+          }}>
+            <li>添加和管理多个 WhatsApp 账号</li>
+            <li>为每个账号生成独立的二维码</li>
+            <li>实时查看连接状态</li>
+            <li>切换不同账号进行消息管理</li>
+          </ul>
+        </div>
+
+        <button 
+          className="btn-primary"
+          style={{ width: '100%' }}
+          onClick={(e) => {
+            e.stopPropagation();
+            nav('/channels');
+          }}
+        >
+          前往频道管理 →
+        </button>
       </div>
 
       {/* 功能介绍卡片 */}

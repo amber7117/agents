@@ -8,6 +8,8 @@ export function Sidebar() {
   const menuItems = [
     { path: '/dashboard', icon: '🏠', label: 'Dashboard' },
     { path: '/chat', icon: '💬', label: 'Chat' },
+    { path: '/channels', icon: '📡', label: 'Channels' },
+    { path: '/ai', icon: '🤖', label: 'AI Settings' },
     { path: '/settings', icon: '⚙️', label: 'Settings' },
   ];
 
