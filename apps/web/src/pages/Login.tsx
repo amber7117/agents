@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { api } from '../api';
 import { tokenStore } from '../store';
 import { useNavigate } from 'react-router-dom';
+import { Button } from '../components/ui/button';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -24,10 +25,10 @@ export default function Login() {
       setMsg('请填写所有字段');
       return;
     }
-    
+
     setIsLoading(true);
     setMsg('');
-    
+
     try {
       const r = await api.post('/auth/login', { email, password });
       tokenStore.token = r.data.token;
@@ -41,58 +42,23 @@ export default function Login() {
   };
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '20px'
-    }}>
-      <div className="card" style={{
-        width: '100%',
-        maxWidth: '420px',
-        background: 'rgba(255, 255, 255, 0.08)',
-        backdropFilter: 'blur(20px)',
-        border: '1px solid rgba(255, 255, 255, 0.2)'
-      }}>
+    <div className="auth-page">
+      <div className="card auth-form">
         {/* Logo 和标题 */}
-        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-          <div style={{
-            width: '80px',
-            height: '80px',
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            borderRadius: '20px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '40px',
-            margin: '0 auto 16px',
-            boxShadow: '0 8px 24px rgba(102, 126, 234, 0.3)'
-          }}>
-            💬
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-2xl shadow-xl mb-4">
+            <span className="text-5xl">💬</span>
           </div>
-          <h1 style={{
-            fontSize: '28px',
-            fontWeight: '700',
-            margin: '0 0 8px',
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            backgroundClip: 'text',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent'
-          }}>
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent mb-2">
             欢迎回来
           </h1>
-          <p style={{
-            color: '#b3b3b3',
-            fontSize: '16px',
-            margin: 0
-          }}>
+          <p className="text-gray-500 dark:text-gray-400">
             登录到 WA Business Desk
           </p>
         </div>
 
         {/* 登录表单 */}
-        <form className="form" onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div className="form-group">
             <label className="form-label">邮箱地址</label>
             <input
@@ -107,90 +73,72 @@ export default function Login() {
 
           <div className="form-group">
             <label className="form-label">密码</label>
-            <div style={{ position: 'relative' }}>
+            <div className="relative">
               <input
-                className="input"
+                className="input pr-12"
                 type={showPassword ? 'text' : 'password'}
                 placeholder="请输入您的密码"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={isLoading}
-                style={{ paddingRight: '48px' }}
               />
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon"
                 onClick={() => setShowPassword(!showPassword)}
-                style={{
-                  position: 'absolute',
-                  right: '12px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  background: 'none',
-                  border: 'none',
-                  color: '#b3b3b3',
-                  cursor: 'pointer',
-                  fontSize: '18px'
-                }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
               >
                 {showPassword ? '🙈' : '👁️'}
-              </button>
+              </Button>
             </div>
           </div>
 
           {msg && (
-            <div className={`message ${msg.includes('成功') ? 'message-success' : 'message-error'}`}>
+            <div className={`p-3 rounded-lg text-sm font-medium ${msg.includes('成功')
+              ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800'
+              : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800'
+              }`}>
               {msg}
             </div>
           )}
 
-          <button
+          <Button
             type="submit"
-            className="btn btn-primary"
             disabled={isLoading}
-            style={{
-              width: '100%',
-              height: '48px',
-              fontSize: '16px',
-              fontWeight: '600'
-            }}
+            className="w-full h-12 text-base font-semibold bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] focus:ring-4 focus:ring-purple-500/50"
           >
             {isLoading ? (
               <>
-                <div className="loading"></div>
+                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
                 登录中...
               </>
             ) : (
-              '🔑 登录'
+              <>
+                <span className="mr-2">🔑</span>
+                登录
+              </>
             )}
-          </button>
+          </Button>
 
           {/* 分割线 */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '16px',
-            margin: '24px 0'
-          }}>
-            <div style={{ flex: 1, height: '1px', background: 'rgba(255, 255, 255, 0.1)' }}></div>
-            <span style={{ color: '#808080', fontSize: '14px' }}>或</span>
-            <div style={{ flex: 1, height: '1px', background: 'rgba(255, 255, 255, 0.1)' }}></div>
+          <div className="flex items-center gap-4 my-6">
+            <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700"></div>
+            <span className="text-gray-500 dark:text-gray-400 text-sm">或</span>
+            <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700"></div>
           </div>
 
           {/* 注册链接 */}
-          <div style={{ textAlign: 'center' }}>
-            <span style={{ color: '#b3b3b3', fontSize: '14px' }}>
+          <div className="text-center">
+            <span className="text-gray-600 dark:text-gray-400 text-sm">
               还没有账户？{' '}
               <button
                 type="button"
                 onClick={() => nav('/register')}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#667eea',
-                  cursor: 'pointer',
-                  textDecoration: 'underline',
-                  fontSize: '14px'
-                }}
+                className="text-purple-600 dark:text-purple-400 font-semibold hover:text-purple-700 dark:hover:text-purple-300 transition-colors"
               >
                 立即注册
               </button>

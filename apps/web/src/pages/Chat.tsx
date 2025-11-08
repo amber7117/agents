@@ -8,10 +8,20 @@ import { ChatSearch } from '../components/ChatSearch';
 import { useNavigate } from 'react-router-dom';
 import { chatHistoryManager, ChatMessage } from '../utils/chatHistory';
 import { dbSyncService } from '../services/dbSync';
+import { metronicTheme } from '../theme/metronic-theme';
+
+// 扩展消息类型，包含频道信息
+interface ExtendedMessage {
+  from: string;
+  text: string;
+  ts: number;
+  channel?: 'WA' | 'TG' | 'WEB';
+  channelId?: string;
+}
 
 export default function Chat() {
   const [sock, setSock] = useState<Socket | null>(null);
-  const [messages, setMessages] = useState<{from: string; text: string; ts: number}[]>([]);
+  const [messages, setMessages] = useState<ExtendedMessage[]>([]);
   const [chats, setChats] = useState<string[]>([]);
   const [active, setActive] = useState<string | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
@@ -29,23 +39,28 @@ export default function Chat() {
   // 初始化时加载聊天历史（本地+数据库）
   useEffect(() => {
     const loadChatsHistory = async () => {
+      if (!tokenStore.token) return; // 确保有 token 才加载
+
       setIsLoadingChats(true);
       try {
         // 1. 从数据库获取聊天
         const dbChats = await dbSyncService.getChats();
         const dbChatIds = dbChats.map((chat: any) => chat.contact.whatsappId);
-        
+
         // 2. 从本地存储获取聊天
         const localContacts = chatHistoryManager.getAllContacts();
-        
+
         // 3. 合并去重
         const allChats = Array.from(new Set([...dbChatIds, ...localContacts]));
         setChats(allChats);
-      } catch (error) {
+      } catch (error: any) {
         console.error('加载聊天历史失败:', error);
-        // 回退到本地存储
-        const savedContacts = chatHistoryManager.getAllContacts();
-        setChats(savedContacts);
+        // 如果是 401 错误，不做额外处理（拦截器会处理）
+        // 其他错误则回退到本地存储
+        if (error.response?.status !== 401) {
+          const savedContacts = chatHistoryManager.getAllContacts();
+          setChats(savedContacts);
+        }
       } finally {
         setIsLoadingChats(false);
       }
@@ -80,7 +95,7 @@ export default function Chat() {
         try {
           const dbChats = await dbSyncService.getChats();
           const targetChat = dbChats.find((chat: any) => chat.contact.whatsappId === active);
-          
+
           if (targetChat) {
             const dbMessages = await dbSyncService.getChatMessages(targetChat.id);
             const formattedDbMessages = dbMessages.messages.map((msg: any) => ({
@@ -88,7 +103,7 @@ export default function Chat() {
               text: msg.content,
               ts: new Date(msg.sentAt).getTime()
             }));
-            
+
             // 合并并去重消息（以数据库为准）
             setMessages(formattedDbMessages.length > 0 ? formattedDbMessages : localMessages);
           }
@@ -103,22 +118,44 @@ export default function Chat() {
     loadContactHistory();
   }, [active]);
 
+  // Socket.IO 连接（只在组件挂载时创建一次）
   useEffect(() => {
     if (!tokenStore.token) return;
 
+    console.log('🔌 [Chat] Initializing Socket.IO connection...');
     const s = io(API_URL, { auth: { token: tokenStore.token } });
-    
+
     s.on('connect', () => {
+      console.log('✅ [Chat] Connected to server, socket ID:', s.id);
       setConnectionStatus('connected');
     });
 
     s.on('disconnect', () => {
+      console.log('❌ [Chat] Disconnected from server');
       setConnectionStatus('disconnected');
     });
 
-    s.on('wa.message', async (m: { channelId: string; from: string; text: string; ts: number }) => {
-      console.log(`[Debug] 接收到消息 from channel ${m.channelId}:`, m.from);
-      
+    s.on('connect_error', (error) => {
+      console.error('❌ [Chat] Connection error:', error);
+    });
+
+    // 监听统一的 chat.message 事件（包含频道信息）
+    s.on('chat.message', async (m: {
+      channel: 'WA' | 'TG' | 'WEB';
+      from: string;
+      text: string;
+      ts: number;
+      direction: 'in' | 'out';
+      channelId?: string;
+    }) => {
+      console.log(`📨 [Chat] Received ${m.channel} message:`, {
+        channel: m.channel,
+        from: m.from,
+        text: m.text ? (m.text.substring(0, 30) + (m.text.length > 30 ? '...' : '')) : '[empty]',
+        ts: m.ts,
+        channelId: m.channelId
+      });
+
       // 保存到本地历史记录
       chatHistoryManager.addMessage(m.from, {
         from: m.from,
@@ -134,34 +171,125 @@ export default function Chat() {
         sentAt: new Date(m.ts).toISOString()
       }).catch(console.error);
 
-      // 只有当前激活的聊天才更新UI
-      if (active === m.from) {
-        console.log(`[Debug] 接收到来自 ${m.from} 的消息:`, m);
-        // 确保消息的 from 字段正确设置为发送方
-        const incomingMessage = {
-          from: m.from,  // 保持原始发送方
-          text: m.text,
-          ts: m.ts
-        };
-        setMessages(prev => {
-          const newMessages = [...prev, incomingMessage];
-          console.log(`[Debug] 接收消息后的消息列表:`, newMessages);
-          return newMessages;
-        });
-      }
-      
+      // 创建消息对象
+      const incomingMessage: ExtendedMessage = {
+        from: m.from,
+        text: m.text,
+        ts: m.ts,
+        channel: m.channel,
+        channelId: m.channelId
+      };
+
+      // 更新消息列表 - 使用 ref 来访问最新的 active 状态
+      setActive(currentActive => {
+        console.log(`🔍 [Chat] Current active: ${currentActive}, message from: ${m.from}`);
+
+        if (currentActive === m.from) {
+          console.log(`✅ [Chat] Adding message to active chat`);
+          setMessages(currentMessages => [...currentMessages, incomingMessage]);
+        } else {
+          console.log(`ℹ️ [Chat] Message from ${m.from}, but active chat is ${currentActive || 'none'}`);
+        }
+
+        return currentActive; // 返回不变的 active 值
+      });
+
       // 更新联系人列表
-      if (!chats.includes(m.from)) {
-        setChats(prev => Array.from(new Set([...prev, m.from])));
+      setChats(prev => {
+        if (!prev.includes(m.from)) {
+          return Array.from(new Set([...prev, m.from]));
+        }
+        return prev;
+      });
+    });
+
+    // 保留兼容旧的 wa.message 事件
+    s.on('wa.message', async (m: { channelId: string; from: string; text: string; ts: number }) => {
+      console.log(`📨 [Chat] Received legacy WA message from ${m.from}`);
+
+      // 保存到本地历史记录
+      chatHistoryManager.addMessage(m.from, {
+        from: m.from,
+        text: m.text,
+        timestamp: m.ts,
+        direction: 'incoming'
+      });
+
+      // 异步保存到数据库
+      dbSyncService.saveMessage(m.from, {
+        direction: 'INCOMING',
+        content: m.text,
+        sentAt: new Date(m.ts).toISOString()
+      }).catch(console.error);
+
+      // 创建消息对象
+      const incomingMessage: ExtendedMessage = {
+        from: m.from,
+        text: m.text,
+        ts: m.ts,
+        channel: 'WA',
+        channelId: m.channelId
+      };
+
+      // 更新消息列表 - 使用相同的模式
+      setActive(currentActive => {
+        console.log(`🔍 [Chat] (wa.message) Current active: ${currentActive}, message from: ${m.from}`);
+
+        if (currentActive === m.from) {
+          console.log(`✅ [Chat] (wa.message) Adding message to active chat`);
+          setMessages(currentMessages => [...currentMessages, incomingMessage]);
+        } else {
+          console.log(`ℹ️ [Chat] (wa.message) Message from ${m.from}, but active chat is ${currentActive || 'none'}`);
+        }
+
+        return currentActive; // 返回不变的 active 值
+      });
+
+      // 更新联系人列表
+      setChats(prev => {
+        if (!prev.includes(m.from)) {
+          return Array.from(new Set([...prev, m.from]));
+        }
+        return prev;
+      });
+    });
+
+    // 监听 WhatsApp 连接完成事件，自动同步聊天记录和联系人
+    s.on('wa.connected', async (payload: { channelId: string; phoneNumber?: string }) => {
+      console.log('✅ [Chat] WhatsApp connected! Syncing chats and contacts...', payload);
+
+      try {
+        // 调用同步 API 获取所有聊天记录
+        const response = await fetch(`${API_URL}/sync/chats`, {
+          headers: { Authorization: `Bearer ${tokenStore.token}` }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          console.log(`📥 [Chat] Synced ${data.length} chats from server`);
+
+          // 提取联系人列表并更新
+          const contactIds = data.map((chat: any) => chat.contact.whatsappId);
+          setChats(prev => {
+            const combined = Array.from(new Set([...prev, ...contactIds]));
+            console.log(`📇 [Chat] Updated contact list: ${combined.length} contacts`);
+            return combined;
+          });
+        } else {
+          console.error('❌ [Chat] Failed to sync chats:', response.status);
+        }
+      } catch (error) {
+        console.error('❌ [Chat] Error syncing chats:', error);
       }
     });
 
     setSock(s);
-    
+
     return () => {
+      console.log('🔌 [Chat] Closing Socket.IO connection');
       s.close();
     };
-  }, [active, chats]);
+  }, []); // 空依赖数组 - 只在组件挂载时创建一次
 
   const send = async (text: string) => {
     if (!active) {
@@ -169,12 +297,12 @@ export default function Chat() {
       return;
     }
     if (!text.trim()) return;
-    
+
     // 发送消息，使用默认频道
     sock?.emit('wa.send', { channelId: 'default', to: active, text });
-    
+
     const timestamp = Date.now();
-    
+
     // 保存到本地历史记录
     chatHistoryManager.addMessage(active, {
       from: 'me',
@@ -182,14 +310,14 @@ export default function Chat() {
       timestamp,
       direction: 'outgoing'
     });
-    
+
     // 异步保存到数据库
     dbSyncService.saveMessage(active, {
       direction: 'OUTGOING',
       content: text,
       sentAt: new Date(timestamp).toISOString()
     }).catch(console.error);
-    
+
     // 添加发送的消息到本地显示
     const newMessage = {
       from: 'me',
@@ -208,13 +336,27 @@ export default function Chat() {
     try {
       await dbSyncService.syncFromWhatsApp();
       alert('同步请求已发送，数据将在后台更新');
-      
+
       // 重新加载聊天列表
       window.location.reload();
     } catch (error) {
       console.error('同步失败:', error);
       alert('同步失败，请稍后再试');
     }
+  };
+
+  const handleDeleteChat = (jid: string) => {
+    // 从聊天列表中移除
+    setChats(prev => prev.filter(c => c !== jid));
+
+    // 如果删除的是当前活跃聊天，清空选中
+    if (active === jid) {
+      setActive(null);
+      setMessages([]);
+    }
+
+    // 清理本地历史记录
+    chatHistoryManager.deleteContactHistory(jid);
   };
 
   const getConnectionStatusColor = () => {
@@ -234,7 +376,7 @@ export default function Chat() {
   };
 
   return (
-    <div style={{ 
+    <div style={{
       height: '100vh',
       display: 'flex',
       flexDirection: 'column',
@@ -314,7 +456,7 @@ export default function Chat() {
           <div style={{ width: '280px' }}>
             <ChatSearch onSelectContact={setActive} />
           </div>
-          
+
           <span style={{
             color: '#b3b3b3',
             fontSize: '14px',
@@ -324,7 +466,7 @@ export default function Chat() {
           }}>
             📊 {chats.length} 个聊天
           </span>
-          
+
           <button
             onClick={handleSyncFromWhatsApp}
             style={{
@@ -351,10 +493,10 @@ export default function Chat() {
           >
             📱 同步数据
           </button>
-          
+
           <button
             onClick={() => window.location.reload()}
-            style={{ 
+            style={{
               padding: '10px 14px',
               background: 'rgba(255, 255, 255, 0.1)',
               color: 'white',
@@ -378,21 +520,21 @@ export default function Chat() {
       </div>
 
       {/* 聊天界面 */}
+      {/* 聊天界面 */}
       <div style={{
         display: 'flex',
-        gap: '20px',
+        gap: '0',
         flex: 1,
         minHeight: 0,
-        background: 'rgba(255, 255, 255, 0.03)',
-        border: '1px solid rgba(255, 255, 255, 0.1)',
+        background: metronicTheme.colors.white,
         borderRadius: '16px',
         overflow: 'hidden',
-        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)'
+        boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
       }}>
-        <ChatList chats={chats} onPick={setActive} activeChat={active} />
-        <MessagePane 
-          jid={active} 
-          messages={messages} 
+        <ChatList chats={chats} onPick={setActive} activeChat={active} onDelete={handleDeleteChat} />
+        <MessagePane
+          jid={active}
+          messages={messages}
           onSend={send}
           connectionStatus={connectionStatus}
         />

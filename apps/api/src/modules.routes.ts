@@ -1,8 +1,9 @@
-import { Router } from 'express';
+import express, { Router } from "express";
 import { prisma } from '@pkg/db';
 import { auth } from './middleware/auth';
 
-export const modulesRouter = Router();
+export const modulesRouter: Router = express.Router();
+
 
 /**
  * GET /modules

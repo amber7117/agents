@@ -1,19 +1,24 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
     "outDir": "dist",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "typeRoots": ["./node_modules/@types", "./src/types"]
+    "types": ["node"],
+    "paths": {
+      "@pkg/*": ["../../packages/*/dist"],
+      "@app/*": ["./src/*"]
+    }
   },
   "include": [
-    "src/**/*"
+    "src/**/*",
+    "src/types/**/*"
   ],
   "exclude": [
     "node_modules",
     "dist"
   ]
 }
-

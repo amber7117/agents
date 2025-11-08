@@ -9,6 +9,11 @@ import Chat from './pages/Chat';
 import Channels from './pages/Channels';
 import Settings from './pages/Settings';
 import AISettings from './pages/AISettings';
+import AgentManagement from './pages/AgentManagement';
+import SettingsWidget from './pages/SettingsWidget';
+
+import './styles/globals.css';
+
 
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
@@ -22,7 +27,9 @@ createRoot(document.getElementById('root')!).render(
           <Route path="chat" element={<Chat />} />
           <Route path="channels" element={<Channels />} />
           <Route path="settings" element={<Settings />} />
+          <Route path="/settings/widget" element={<SettingsWidget />} />
           <Route path="ai" element={<AISettings />} />
+          <Route path="agent-management" element={<AgentManagement />} />
         </Route>
       </Routes>
     </BrowserRouter>

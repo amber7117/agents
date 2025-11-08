@@ -7,11 +7,13 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "strict": true,
+    "types": [],
+    "typeRoots": ["./node_modules/@types"],
     "resolveJsonModule": true,
     "declaration": true,
     "declarationMap": true,
     "outDir": "dist",
-    "rootDir": "src"
+    "rootDir": "src",
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]

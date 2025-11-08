@@ -11,8 +11,10 @@ model User {
   id              String             @id @default(cuid())
   email           String             @unique
   password        String
+  role            UserRole           @default(USER)
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
+
   sessions        Session[]
   apiCredentials  ApiCredential[]
   channelSessions ChannelSession[]
@@ -21,14 +23,63 @@ model User {
   messages        Message[]
   agentBindings   UserAgentBinding[]
   modules         UserModule?
+  widgets         Widget[]
+  aiConfigs       AIConfig[]         @relation("UserAIConfig")
+}
+
+enum UserRole {
+  ADMIN
+  USER
 }
 
 model Session {
   id        String   @id @default(cuid())
   userId    String
-  createdAt DateTime @default(now())
   label     String?
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ApiCredential {
+  id        String      @id @default(cuid())
+  userId    String
+  provider  AiProvider
+  apiKeyEnc String
+  name      String?
+  isActive  Boolean     @default(true)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([userId, provider])
+  @@map("api_credentials")
+}
+
+model UserModule {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  aiEnabled   Boolean  @default(true)
+  waEnabled   Boolean  @default(true)
+  tgEnabled   Boolean  @default(false)
+  flowEnabled Boolean  @default(false)
+  analytics   Boolean  @default(true)
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@map("user_modules")
+}
+
+model ModuleSettings {
+  id          String  @id @default(cuid())
+  aiEnabled   Boolean @default(true)
+  waEnabled   Boolean @default(true)
+  tgEnabled   Boolean @default(false)
+  flowEnabled Boolean @default(false)
+  analytics   Boolean @default(true)
+  updatedAt   DateTime @updatedAt
+  @@map("module_settings")
 }
 
 model Contact {
@@ -43,10 +94,10 @@ model Contact {
   lastSeen    DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
-  chats       Chat[]
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  messages    Message[]
 
+  chats       Chat[]
+  messages    Message[]
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@unique([userId, whatsappId])
   @@map("contacts")
 }
@@ -58,10 +109,12 @@ model Chat {
   isArchived    Boolean   @default(false)
   isPinned      Boolean   @default(false)
   unreadCount   Int       @default(0)
+  lastMessageId String?   @unique
   lastMessage   String?
   lastMessageAt DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+
   contact       Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
   user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   messages      Message[]
@@ -83,15 +136,20 @@ model Message {
   mimeType          String?
   fileName          String?
   fileSize          Int?
+  tokensUsed        Int?
+  costUSD           Float?
   status            MessageStatus    @default(SENT)
+  channel           Channel          @default(WA)
   isStarred         Boolean          @default(false)
   isDeleted         Boolean          @default(false)
   replyToId         String?
   sentAt            DateTime
   deliveredAt       DateTime?
   readAt            DateTime?
+  meta              Json?
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
+
   chat              Chat             @relation(fields: [chatId], references: [id], onDelete: Cascade)
   contact           Contact          @relation(fields: [contactId], references: [id], onDelete: Cascade)
   replyTo           Message?         @relation("MessageReplies", fields: [replyToId], references: [id])
@@ -101,97 +159,148 @@ model Message {
   @@map("messages")
 }
 
-model UserModule {
-  id          String   @id @default(cuid())
-  userId      String   @unique
-  waEnabled   Boolean  @default(true)
-  tgEnabled   Boolean  @default(false)
-  aiEnabled   Boolean  @default(false)
-  flowEnabled Boolean  @default(false)
-  updatedAt   DateTime @updatedAt
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+model ChannelSession {
+  id            String       @id @default(cuid())
+  userId        String
+  channel       Channel
+  channelId     String
+  phoneNumber   String?
+  name          String?
+  state         ChannelState @default(DISCONNECTED)
+  deviceLabel   String?
+  lastQRAt      DateTime?
+  lastConnected DateTime?
+  meta          Json?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@map("user_modules")
-}
-
-model ApiCredential {
-  id        String   @id @default(cuid())
-  userId    String
-  provider  String   // OPENAI, DEEPSEEK, ANTHROPIC, GROK, GEMINI
-  apiKeyEnc String   // Encrypted API key
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, provider])
-  @@map("api_credentials")
+  @@unique([userId, channelId])
+  @@index([userId, channel])
+  @@map("channel_sessions")
 }
 
 model AgentTemplate {
-  id          String   @id @default(cuid())
-  name        String
-  description String?
-  prompt      String
-  provider    String   // Default provider for this template
-  model       String   // Default model for this template
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String   @id @default(cuid())
+  name          String
+  avatarUrl     String?
+  color         String   @default("blue")
+  description   String?
+  role          String?
+  character     String?  @db.Text
+  expertise     String?
+  language      String?
+  background    String?  @db.Text
+  prompt        String   @db.Text
+  responseStyle String?  @db.Text
+  constraints   String?  @db.Text
+  examples      Json?
+  tags          String[]
+  provider      AiProvider
+  model         String
+  temperature   Float    @default(0.7)
+  functions     Json?
+  isGlobal      Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  bindings UserAgentBinding[]
-
+  bindings      UserAgentBinding[]
   @@map("agent_templates")
 }
 
 model UserAgentBinding {
-  id            String   @id @default(cuid())
-  userId        String
-  channel       String   // WA, TG
-  templateId    String
-  enabled       Boolean  @default(true)
-  modelOverride String?  // Override default model from template
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id             String   @id @default(cuid())
+  userId         String?
+  channel        Channel?
+  templateId     String
+  enabled        Boolean  @default(true)
+  modelOverride  String?
+  priority       Int      @default(0)
+  triggerKeywords String[] // 关键词触发（可选）
+  contextTags    String[]  // 语境匹配（可选）
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  template AgentTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  user           User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  template       AgentTemplate  @relation(fields: [templateId], references: [id], onDelete: Cascade)
 
   @@unique([userId, channel])
+  @@index([priority])
   @@map("user_agent_bindings")
 }
 
-model MessageLog {
-  id        String           @id @default(cuid())
-  userId    String
-  channel   Channel
-  direction MessageDirection
-  peer      String
-  text      String
-  aiUsed    Boolean          @default(false)
-  createdAt DateTime         @default(now())
+model AIConfig {
+  id              String   @id @default(cuid())
+  userId          String?  // null 表示系统全局配置
+  provider        AiProvider
+  model           String
+  temperature     Float    @default(0.7)
+  topP            Float    @default(1.0)
+  frequencyPenalty Float   @default(0.0)
+  presencePenalty  Float   @default(0.0)
+  maxTokens       Int      @default(4096)
+  systemPrompt    String?
+  persona         String?
+  replyStyle      String?
+  dailyBudgetUSD  Float    @default(1.00)
+  language        String   @default("zh-CN")
+  enabled         Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  @@index([userId, channel])
-  @@map("message_logs")
+  user            User?    @relation("UserAIConfig", fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+  @@map("ai_configs")
 }
 
-model ChannelSession {
-  id            String    @id @default(cuid())
-  userId        String
-  channel       Channel
-  channelId     String    // 频道实例 ID（如 whatsapp-1699876543210）
-  phoneNumber   String?   // 电话号码
-  name          String?   // 频道名称
-  state         String
-  deviceLabel   String?
-  lastQRAt      DateTime?
-  lastConnected DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+model Widget {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  scriptCode  String?   // 可选，用来生成 <script> 挂件代码
+  domain      String?   // 对应的网站域名
+  enabled     Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
-  @@unique([userId, channelId], name: "userId_channelId")
-  @@index([userId, channel])
-  @@map("channel_sessions")
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("widgets")
+}
+
+model WaAuth {
+  id          String   @id @default(cuid())
+  channelId   String   @unique
+  userId      String
+  credsCipher String   @db.Text
+  keysCipher  String   @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  @@map("wa_auth")
+}
+
+enum Channel {
+  WA
+  TG
+  WEB
+}
+
+enum ChannelState {
+  CONNECTING
+  WAITING_QR
+  OPEN
+  READY
+  DISCONNECTED
+}
+
+enum AiProvider {
+  OPENAI
+  DEEPSEEK
+  ANTHROPIC
+  GROK
+  GEMINI
 }
 
 enum MessageDirection {
@@ -216,25 +325,4 @@ enum MessageStatus {
   DELIVERED
   READ
   FAILED
-}
-
-enum Channel {
-  WA
-  TG
-}
-
-enum AiProvider {
-  OPENAI
-  DEEPSEEK
-  ANTHROPIC
-  GROK
-  GEMINI
-}
-
-enum Provider {
-  OPENAI
-  DEEPSEEK
-  ANTHROPIC
-  GROK
-  GEMINI
 }

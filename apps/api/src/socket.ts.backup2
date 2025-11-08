@@ -1,0 +1,432 @@
+import { Server } from 'socket.io'; import { Server } from 'socket.io'; import { Server } from 'socket.io';
+
+import type { Server as HTTPServer } from 'http';
+
+import jwt from 'jsonwebtoken'; import type { Server as HTTPServer } from 'http'; import type { Server as HTTPServer } from 'http';
+
+import { config } from './config';
+
+import { getWAChannel } from './channels/wa.routes'; import jwt from 'jsonwebtoken'; import jwt from 'jsonwebtoken';
+
+import { initWidgetNamespace, visitorToSocket, sendToVisitor } from './widget/ns';
+
+import { prisma } from '@pkg/db'; import { config } from './config'; import { config } from './config';
+
+
+
+export function initIO(httpServer: HTTPServer) {
+    import { getWAChannel } from './channels/wa.routes'; import { getWAChannel } from './channels/wa.routes';
+
+    const io = new Server(httpServer, {
+
+        cors: { origin: config.corsOrigin, credentials: true }, import { initWidgetNamespace, visitorToSocket, sendToVisitor } from './widget/ns';
+
+    });
+
+    import { prisma } from '@pkg/db'; export function initIO(httpServer: HTTPServer) {
+
+        io.use((socket, next) => {
+
+            const token = (socket.handshake.auth as any)?.token; const io = new Server(httpServer, {
+
+                if(!token) return next(new Error('missing token'));
+
+                try { export function initIO(httpServer: HTTPServer) {
+
+                    const dec = jwt.verify(token, config.jwtSecret) as any; cors: { origin: config.corsOrigin, credentials: true },
+
+            (socket as any).uid = dec.uid;
+
+            next(); const io = new Server(httpServer, {});
+
+        } catch {
+
+            next(new Error('invalid token')); cors: { origin: config.corsOrigin, credentials: true },
+
+        }
+
+    });
+}); io.use((socket, next) => {
+
+
+
+    // 初始化 Widget 命名空间        const token = (socket.handshake.auth as any)?.token;
+
+    const widgetNs = initWidgetNamespace(io);
+
+    io.use((socket, next) => {
+
+        io.on('connection', async (socket) => {
+            if (!token) return next(new Error('missing token'));
+
+            const uid = (socket as any).uid as string;
+
+            socket.join(uid); const token = (socket.handshake.auth as any)?.token; try {
+
+
+
+                // 获取共享的 WhatsApp 频道实例                if (!token) return next(new Error('missing token')); const dec = jwt.verify(token, config.jwtSecret) as any;
+
+                const waChannel = getWAChannel();
+
+                try {
+
+                    // ===== 保留原有 WA 事件（向后兼容）=====                    (socket as any).uid = dec.uid;
+
+
+
+                    // 监听启动 WhatsApp 连接请求（带 channelId）                    const dec = jwt.verify(token, config.jwtSecret) as any; next();
+
+                    socket.on('wa.start', async (payload: { channelId: string }) => {
+
+                        try {
+                            (socket as any).uid = dec.uid;
+
+                            await waChannel.ensure(uid, payload.channelId);
+                        } catch {
+
+                        } catch (err) {
+
+                            console.error(`Failed to start WhatsApp for ${uid}:`, err); next(); next(new Error('invalid token'));
+
+                            socket.emit('wa.error', {
+
+                                channelId: payload.channelId,
+                            } catch { }
+
+                            error: err instanceof Error ? err.message : String(err)
+
+                        }); next(new Error('invalid token'));
+
+                }            });
+
+    });
+
+}
+
+        // 监听客户端发送消息请求
+
+        socket.on('wa.send', async (payload: { channelId: string; to: string; text: string }) => { }); io.on('connection', async (socket) => {
+
+    try {
+
+        await waChannel.send(uid, payload.channelId, payload.to, payload.text); const uid = (socket as any).uid as string;
+
+    } catch (err) {
+
+        console.error(`Failed to send message for ${uid}:`, err);        // 初始化 Widget 命名空间        socket.join(uid);
+
+        socket.emit('wa.error', {
+
+            channelId: payload.channelId, const widgetNs = initWidgetNamespace(io);
+
+            error: err instanceof Error ? err.message : String(err)
+
+        });        // 获取共享的 WhatsApp 频道实例
+
+    }
+
+}); io.on('connection', async (socket) => {
+
+    const waChannel = getWAChannel();
+
+    // 监听停止 WhatsApp 连接请求
+
+    socket.on('wa.stop', async (payload: { channelId: string }) => {
+        const uid = (socket as any).uid as string;
+
+        try {
+
+            await waChannel.stop(uid, payload.channelId); socket.join(uid);        // 监听启动 WhatsApp 连接请求（带 channelId）
+
+            socket.emit('wa.stopped', { channelId: payload.channelId, success: true });
+
+        } catch (err) {
+            socket.on('wa.start', async (payload: { channelId: string }) => {
+
+                console.error(`Failed to stop WhatsApp for ${uid}:`, err);
+
+                socket.emit('wa.error', {                // 获取共享的 WhatsApp 频道实例            try {
+
+                    channelId: payload.channelId,
+
+                    error: err instanceof Error ? err.message : String(err)                const waChannel = getWAChannel(); await waChannel.ensure(uid, payload.channelId);
+
+                });
+
+            }            } catch (err) {
+
+            });
+
+    // ===== 保留原有 WA 事件（向后兼容）=====                console.error(`Failed to start WhatsApp for ${uid}:`, err);
+
+    // ===== 新增统一 chat 事件 =====
+
+    socket.emit('wa.error', {
+
+        // 统一发送消息事件
+
+        socket.on('chat.send', async (payload: {                     // 监听启动 WhatsApp 连接请求（带 channelId）                    channelId: payload.channelId,
+
+            channel: 'WA' | 'TG' | 'WEB';
+
+            to: string;                     socket.on('wa.start', async (payload: { channelId: string }) => {
+
+                text: string; error: err instanceof Error ? err.message : String(err)
+
+                channelId ?: string; // WA 需要
+
+            }) => { try {});
+
+    try {
+
+        const { channel, to, text, channelId } = payload; await waChannel.ensure(uid, payload.channelId);
+
+        const timestamp = new Date();
+    }
+
+
+
+                if (channel === 'WA') { } catch (err) { });
+
+// WhatsApp 消息
+
+const cid = channelId || 'default'; console.error(`Failed to start WhatsApp for ${uid}:`, err);
+
+await waChannel.send(uid, cid, to, text);
+
+socket.emit('wa.error', {        // 监听客户端发送消息请求
+
+    // 本地回显
+
+    socket.emit('chat.message', {
+        channelId: payload.channelId, socket.on('wa.send', async (payload: { channelId: string; to: string; text: string }) => {
+
+            channel: 'WA',
+
+                from: uid, error: err instanceof Error ? err.message : String(err)            try {
+
+                    to,
+
+                        text,                }); await waChannel.send(uid, payload.channelId, payload.to, payload.text);
+
+        ts: timestamp.toISOString(),
+
+        direction: 'out',
+    }            } catch (err) {
+
+        channelId: cid,
+
+                    });        }); console.error(`Failed to send message for ${uid}:`, err);
+
+                } else if (channel === 'WEB') {
+
+    // Web 访客消息 (to 格式: widgetId:visitorId)socket.emit('wa.error', {
+
+    const socketId = visitorToSocket.get(to);
+
+    // 监听客户端发送消息请求                    channelId: payload.channelId,
+
+    if (!socketId) {
+
+        throw new Error('Visitor not connected'); socket.on('wa.send', async (payload: { channelId: string; to: string; text: string }) => {
+
+        }        error: err instanceof Error ? err.message : String(err)
+
+
+
+                    // 发送给访客        try { });
+
+                    await sendToVisitor(widgetNs, to, text);
+
+        await waChannel.send(uid, payload.channelId, payload.to, payload.text);
+
+        // 记录到数据库}
+
+        await prisma.messageLog.create({
+
+            data: {} catch(err) { });
+
+        userId: uid,
+
+            channel: 'WEB', console.error(`Failed to send message for ${uid}:`, err);
+
+        direction: 'OUTGOING',
+
+            peer: to, socket.emit('wa.error', {        // 监听停止 WhatsApp 连接请求
+
+                text,
+
+                aiUsed: false, channelId: payload.channelId, socket.on('wa.stop', async (payload: { channelId: string }) => {
+
+                },
+
+                    }); error: err instanceof Error ? err.message : String(err)            try {
+
+
+
+            // 本地回显（不广播给坐席自己，避免重复）        }); await waChannel.stop(uid, payload.channelId);
+
+            socket.emit('chat.message', {
+
+                channel: 'WEB',
+            }                socket.emit('wa.stopped', { channelId: payload.channelId, success: true });
+
+            from: uid,
+
+                to,        });
+    } catch (err) {
+
+        text,
+
+            ts: timestamp.toISOString(), console.error(`Failed to stop WhatsApp for ${uid}:`, err);
+
+        direction: 'out',
+
+                    });    // 监听停止 WhatsApp 连接请求                socket.emit('wa.error', {
+
+} else if (channel === 'TG') {
+
+    // TODO: Telegram 实现    socket.on('wa.stop', async (payload: { channelId: string }) => {
+
+    socket.emit('chat.error', {
+        channelId: payload.channelId,
+
+        channel: 'TG',
+
+        error: 'Telegram not implemented yet', try {
+
+        }); error: err instanceof Error ? err.message : String(err)
+
+}
+
+            } catch (err) {
+    await waChannel.stop(uid, payload.channelId);
+
+    console.error(`Failed to send chat message for ${uid}:`, err);
+});
+
+socket.emit('chat.error', {
+
+    channel: payload.channel, socket.emit('wa.stopped', { channelId: payload.channelId, success: true });
+
+    error: err instanceof Error ? err.message : String(err)
+}
+
+                });
+
+            }            } catch (err) { });
+
+        });
+
+console.error(`Failed to stop WhatsApp for ${uid}:`, err);
+
+// 监听断开连接
+
+socket.on('disconnect', () => {
+    socket.emit('wa.error', {        // 监听断开连接
+
+        console.log(`User ${uid} disconnected`);
+
+    }); channelId: payload.channelId, socket.on('disconnect', () => {
+
+    });
+
+    error: err instanceof Error ? err.message : String(err)            console.log(`User ${uid} disconnected`);
+
+    return io;
+
+}    });
+
+});
+
+            }    });
+
+        });
+
+return io;
+
+// ===== 新增统一 chat 事件 =====}
+
+// 统一发送消息事件
+socket.on('chat.send', async (payload: {
+    channel: 'WA' | 'TG' | 'WEB';
+    to: string;
+    text: string;
+    channelId?: string; // WA 需要
+}) => {
+    try {
+        const { channel, to, text, channelId } = payload;
+        const timestamp = new Date();
+
+        if (channel === 'WA') {
+            // WhatsApp 消息
+            const cid = channelId || 'default';
+            await waChannel.send(uid, cid, to, text);
+
+            // 本地回显
+            socket.emit('chat.message', {
+                channel: 'WA',
+                from: uid,
+                to,
+                text,
+                ts: timestamp.toISOString(),
+                direction: 'out',
+                channelId: cid,
+            });
+        } else if (channel === 'WEB') {
+            // Web 访客消息 (to 格式: widgetId:visitorId)
+            const socketId = visitorToSocket.get(to);
+
+            if (!socketId) {
+                throw new Error('Visitor not connected');
+            }
+
+            // 发送给访客
+            await sendToVisitor(widgetNs, to, text);
+
+            // 记录到数据库
+            await prisma.messageLog.create({
+                data: {
+                    userId: uid,
+                    channel: 'WEB',
+                    direction: 'OUTGOING',
+                    peer: to,
+                    text,
+                    aiUsed: false,
+                },
+            });
+
+            // 本地回显（不广播给坐席自己，避免重复）
+            socket.emit('chat.message', {
+                channel: 'WEB',
+                from: uid,
+                to,
+                text,
+                ts: timestamp.toISOString(),
+                direction: 'out',
+            });
+        } else if (channel === 'TG') {
+            // TODO: Telegram 实现
+            socket.emit('chat.error', {
+                channel: 'TG',
+                error: 'Telegram not implemented yet',
+            });
+        }
+    } catch (err) {
+        console.error(`Failed to send chat message for ${uid}:`, err);
+        socket.emit('chat.error', {
+            channel: payload.channel,
+            error: err instanceof Error ? err.message : String(err)
+        });
+    }
+});
+
+// 监听断开连接
+socket.on('disconnect', () => {
+    console.log(`User ${uid} disconnected`);
+});
+    });
+
+return io;
+}

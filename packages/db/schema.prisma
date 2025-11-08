@@ -1,0 +1,366 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String             @id @default(cuid())
+  email           String             @unique
+  password        String
+  role            UserRole           @default(USER)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  sessions        Session[]
+  apiCredentials  ApiCredential[]
+  channelSessions ChannelSession[]
+  chats           Chat[]
+  contacts        Contact[]
+  messages        Message[]
+  agentBindings   UserAgentBinding[]
+  modules         UserModule?
+  widgets         Widget[]
+  aiConfigs       AIConfig[]         @relation("UserAIConfig")
+}
+
+enum UserRole {
+  ADMIN
+  USER
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  label     String?
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ApiCredential {
+  id        String      @id @default(cuid())
+  userId    String
+  provider  AiProvider
+  apiKeyEnc String
+  name      String?
+  isActive  Boolean     @default(true)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([userId, provider])
+  @@map("api_credentials")
+}
+
+model UserModule {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  aiEnabled   Boolean  @default(true)
+  waEnabled   Boolean  @default(true)
+  tgEnabled   Boolean  @default(false)
+  flowEnabled Boolean  @default(false)
+  analytics   Boolean  @default(true)
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@map("user_modules")
+}
+
+model ModuleSettings {
+  id        String   @id @default(cuid())
+  userId    String?
+  aiEnabled Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("module_settings")
+}
+
+model Contact {
+  id          String    @id @default(cuid())
+  userId      String
+  whatsappId  String
+  name        String?
+  phoneNumber String?
+  avatar      String?
+  isBlocked   Boolean   @default(false)
+  isMuted     Boolean   @default(false)
+  lastSeen    DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  chats       Chat[]
+  messages    Message[]
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([userId, whatsappId])
+  @@map("contacts")
+}
+
+model Chat {
+  id            String    @id @default(cuid())
+  userId        String
+  contactId     String
+  isArchived    Boolean   @default(false)
+  isPinned      Boolean   @default(false)
+  unreadCount   Int       @default(0)
+  lastMessageId String?   @unique
+  lastMessage   String?
+  lastMessageAt DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  contact       Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages      Message[]
+
+  @@unique([userId, contactId])
+  @@map("chats")
+}
+
+model Message {
+  id                String           @id @default(cuid())
+  userId            String
+  chatId            String
+  contactId         String
+  whatsappMessageId String?
+  direction         MessageDirection
+  content           String
+  messageType       MessageType      @default(TEXT)
+  mediaUrl          String?
+  mimeType          String?
+  fileName          String?
+  fileSize          Int?
+  tokensUsed        Int?
+  costUSD           Float?
+  status            MessageStatus    @default(SENT)
+  channel           Channel          @default(WA)
+  isStarred         Boolean          @default(false)
+  isDeleted         Boolean          @default(false)
+  replyToId         String?
+  sentAt            DateTime
+  deliveredAt       DateTime?
+  readAt            DateTime?
+  meta              Json?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  chat              Chat             @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  contact           Contact          @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  replyTo           Message?         @relation("MessageReplies", fields: [replyToId], references: [id])
+  replies           Message[]        @relation("MessageReplies")
+  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("messages")
+}
+
+model ChannelSession {
+  id            String       @id @default(cuid())
+  userId        String
+  channel       Channel
+  channelId     String
+  phoneNumber   String?
+  name          String?
+  state         ChannelState @default(DISCONNECTED)
+  deviceLabel   String?
+  lastQRAt      DateTime?
+  lastConnected DateTime?
+  meta          Json?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, channelId])
+  @@index([userId, channel])
+  @@map("channel_sessions")
+}
+
+model AgentTemplate {
+  id            String   @id @default(cuid())
+  name          String
+  avatarUrl     String?
+  color         String   @default("blue")
+  description   String?
+  role          String?
+  character     String?  @db.Text
+  expertise     String?
+  language      String?
+  background    String?  @db.Text
+  prompt        String   @db.Text
+  responseStyle String?  @db.Text
+  constraints   String?  @db.Text
+  examples      Json?
+  tags          String[]
+  provider      AiProvider
+  model         String
+  temperature   Float    @default(0.7)
+  functions     Json?
+  isGlobal      Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  bindings      UserAgentBinding[]
+  @@map("agent_templates")
+}
+
+model UserAgentBinding {
+  id             String   @id @default(cuid())
+  userId         String?
+  channel        Channel?
+  templateId     String
+  enabled        Boolean  @default(true)
+  modelOverride  String?
+  priority       Int      @default(0)
+  triggerKeywords String[] // 关键词触发（可选）
+  contextTags    String[]  // 语境匹配（可选）
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user           User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  template       AgentTemplate  @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, channel])
+  @@index([priority])
+  @@map("user_agent_bindings")
+}
+
+model AIConfig {
+  id              String   @id @default(cuid())
+  userId          String?  // null 表示系统全局配置
+  provider        AiProvider
+  model           String
+  temperature     Float    @default(0.7)
+  topP            Float    @default(1.0)
+  frequencyPenalty Float   @default(0.0)
+  presencePenalty  Float   @default(0.0)
+  maxTokens       Int      @default(4096)
+  systemPrompt    String?
+  persona         String?
+  replyStyle      String?
+  dailyBudgetUSD  Float    @default(1.00)
+  language        String   @default("zh-CN")
+  enabled         Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user            User?    @relation("UserAIConfig", fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([userId, provider])
+  @@index([userId])
+  @@map("ai_configs")
+}
+
+model Widget {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  publicKey   String   @unique // 新增：widget 的公开标识符
+  scriptCode  String?   // 可选，用来生成 <script> 挂件代码
+  domain      String?   // 对应的网站域名
+  allowedOrigins String[] // 新增：允许的源域名列表
+  enabled     Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("widgets")
+}
+
+model MessageLog {
+  id            String      @id @default(cuid())
+  userId        String?
+  sessionId     String?
+  peer          String?     // 新增：对话方标识符
+  channel       Channel
+  direction     MessageDirection
+  content       String      @db.Text
+  messageType   MessageType @default(TEXT)
+  meta          Json?
+  createdAt     DateTime    @default(now())
+
+  @@index([userId])
+  @@index([sessionId])
+  @@map("message_logs")
+}
+
+model VisitorSession {
+  id            String   @id @default(cuid())
+  widgetId      String?
+  sessionId     String   @unique
+  visitorId     String?
+  displayName   String?  // 新增：访客显示名称
+  userAgent     String?
+  ipAddress     String?
+  location      Json?    // 地理位置信息
+  isActive      Boolean  @default(true)
+  lastActivity  DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([widgetId, visitorId])
+  @@index([widgetId])
+  @@index([visitorId])
+  @@map("visitor_sessions")
+}
+
+model WaAuth {
+  id          String   @id @default(cuid())
+  channelId   String   @unique
+  userId      String
+  credsCipher String   @db.Text
+  keysCipher  String   @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  @@map("wa_auth")
+}
+
+enum Channel {
+  WA
+  TG
+  WEB
+}
+
+enum ChannelState {
+  CONNECTING
+  WAITING_QR
+  OPEN
+  READY
+  DISCONNECTED
+}
+
+enum AiProvider {
+  OPENAI
+  DEEPSEEK
+  ANTHROPIC
+  GROK
+  GEMINI
+}
+
+enum MessageDirection {
+  INCOMING
+  OUTGOING
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  VIDEO
+  AUDIO
+  DOCUMENT
+  LOCATION
+  CONTACT
+  STICKER
+  SYSTEM
+}
+
+enum MessageStatus {
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}

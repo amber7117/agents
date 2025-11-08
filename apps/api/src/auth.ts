@@ -24,7 +24,18 @@ authRouter.post('/login', async (req, res) => {
     if (!user) return res.status(401).json({ error: 'invalid credentials' });
     const ok = await bcrypt.compare(password, user.password);
     if (!ok) return res.status(401).json({ error: 'invalid credentials' });
-    const token = jwt.sign({ uid: user.id }, config.jwtSecret, { expiresIn: '7d' });
+
+    // Token payload 包含 userId, email, role (与 middleware/auth.ts 保持一致)
+    const token = jwt.sign(
+        {
+            userId: user.id,  // 改为 userId (不是 uid)
+            email: user.email,
+            role: 'USER'      // 默认角色
+        },
+        config.jwtSecret,
+        { expiresIn: '7d' }
+    );
+
     res.json({ token });
 });
 
@@ -34,7 +45,11 @@ export function requireAuth(req: any, res: any, next: any) {
     if (!token) return res.status(401).json({ error: 'missing token' });
     try {
         const dec = jwt.verify(token, config.jwtSecret) as any;
-        (req as any).uid = dec.uid;
+        // 兼容新旧 token 格式
+        (req as any).uid = dec.userId || dec.uid;  // 优先使用 userId
+        (req as any).userId = dec.userId || dec.uid;
+        (req as any).email = dec.email;
+        (req as any).role = dec.role || 'USER';
         next();
     } catch {
         return res.status(401).json({ error: 'invalid token' });

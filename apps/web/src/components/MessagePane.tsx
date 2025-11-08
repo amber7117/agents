@@ -1,13 +1,23 @@
 import { useState, useRef, useEffect } from 'react';
+import { metronicTheme } from '../theme/metronic-theme';
 
-export function MessagePane({ 
-  jid, 
-  messages, 
+// 扩展消息类型，包含频道信息
+interface ExtendedMessage {
+  from: string;
+  text: string;
+  ts: number;
+  channel?: 'WA' | 'TG' | 'WEB';
+  channelId?: string;
+}
+
+export function MessagePane({
+  jid,
+  messages,
   onSend,
   connectionStatus = 'connected'
-}: { 
-  jid: string | null; 
-  messages: {from: string; text: string; ts: number}[]; 
+}: {
+  jid: string | null;
+  messages: ExtendedMessage[];
   onSend: (t: string) => void;
   connectionStatus?: 'connecting' | 'connected' | 'disconnected';
 }) {
@@ -38,19 +48,29 @@ export function MessagePane({
     const date = new Date(timestamp);
     const now = new Date();
     const isToday = date.toDateString() === now.toDateString();
-    
+
     if (isToday) {
-      return date.toLocaleTimeString('zh-CN', { 
-        hour: '2-digit', 
-        minute: '2-digit' 
+      return date.toLocaleTimeString('zh-CN', {
+        hour: '2-digit',
+        minute: '2-digit'
       });
     } else {
-      return date.toLocaleDateString('zh-CN', { 
-        month: 'short', 
+      return date.toLocaleDateString('zh-CN', {
+        month: 'short',
         day: 'numeric',
-        hour: '2-digit', 
-        minute: '2-digit' 
+        hour: '2-digit',
+        minute: '2-digit'
       });
+    }
+  };
+
+  // 获取频道图标和颜色
+  const getChannelIcon = (channel?: 'WA' | 'TG' | 'WEB') => {
+    switch (channel) {
+      case 'WA': return { icon: '📱', color: '#25D366', name: 'WhatsApp' };
+      case 'TG': return { icon: '✈️', color: '#0088cc', name: 'Telegram' };
+      case 'WEB': return { icon: '🌐', color: '#667eea', name: 'Web' };
+      default: return { icon: '💬', color: '#808080', name: 'Unknown' };
     }
   };
 
@@ -61,22 +81,31 @@ export function MessagePane({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'rgba(255, 255, 255, 0.02)'
+        background: metronicTheme.colors.white
       }}>
         <div style={{
           textAlign: 'center',
-          color: '#808080'
+          color: metronicTheme.colors.gray600
         }}>
-          <div style={{ fontSize: '64px', marginBottom: '16px' }}>💬</div>
+          <div style={{
+            fontSize: '80px',
+            marginBottom: '24px',
+            opacity: 0.5
+          }}>💬</div>
           <h3 style={{
-            fontSize: '20px',
-            fontWeight: '600',
-            margin: '0 0 8px',
-            color: '#ffffff'
+            fontSize: '22px',
+            fontWeight: '700',
+            margin: '0 0 12px',
+            color: metronicTheme.colors.gray900
           }}>
             选择一个聊天
           </h3>
-          <p style={{ fontSize: '14px', margin: 0 }}>
+          <p style={{
+            fontSize: '15px',
+            margin: 0,
+            color: metronicTheme.colors.gray600,
+            lineHeight: '1.6'
+          }}>
             从左侧列表选择联系人开始聊天
             <br />
             或点击"添加联系人"开始新对话
@@ -91,64 +120,83 @@ export function MessagePane({
       flex: 1,
       display: 'flex',
       flexDirection: 'column',
-      background: 'rgba(255, 255, 255, 0.02)'
+      background: metronicTheme.colors.white
     }}>
       {/* 聊天头部 */}
       <div style={{
-        padding: '16px 20px',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-        background: 'rgba(255, 255, 255, 0.05)',
+        padding: '20px 24px',
+        borderBottom: `1px solid ${metronicTheme.colors.gray200}`,
+        background: metronicTheme.colors.gray100,
         display: 'flex',
         alignItems: 'center',
-        gap: '12px'
+        gap: '14px'
       }}>
         <div style={{
-          width: '40px',
-          height: '40px',
+          width: '48px',
+          height: '48px',
           borderRadius: '50%',
-          background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+          background: `linear-gradient(135deg, ${metronicTheme.colors.primary} 0%, ${metronicTheme.colors.info} 100%)`,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          fontSize: '16px',
-          fontWeight: '600',
-          color: '#ffffff'
+          fontSize: '18px',
+          fontWeight: '700',
+          color: metronicTheme.colors.white,
+          flexShrink: 0
         }}>
           {jid.split('@')[0].slice(-2).toUpperCase()}
         </div>
         <div style={{ flex: 1 }}>
           <h3 style={{
-            fontSize: '16px',
-            fontWeight: '600',
+            fontSize: '17px',
+            fontWeight: '700',
             margin: '0 0 4px',
-            color: '#ffffff'
+            color: metronicTheme.colors.gray900
           }}>
             {formatJid(jid)}
           </h3>
           <div style={{
-            fontSize: '12px',
-            color: '#b3b3b3',
+            fontSize: '13px',
+            color: metronicTheme.colors.gray600,
             display: 'flex',
             alignItems: 'center',
-            gap: '8px'
+            gap: '8px',
+            fontWeight: '500'
           }}>
             <div style={{
-              width: '6px',
-              height: '6px',
+              width: '8px',
+              height: '8px',
               borderRadius: '50%',
-              background: connectionStatus === 'connected' ? '#4facfe' : '#ff9a9e'
+              background: connectionStatus === 'connected' ? metronicTheme.colors.success : metronicTheme.colors.danger,
+              boxShadow: connectionStatus === 'connected' ? `0 0 8px ${metronicTheme.colors.success}` : 'none'
             }}></div>
             {connectionStatus === 'connected' ? '在线' : '离线'}
           </div>
         </div>
         <button
-          className="btn btn-secondary"
           style={{
-            padding: '8px 12px',
-            fontSize: '12px'
+            padding: '10px 16px',
+            background: metronicTheme.colors.white,
+            border: `1px solid ${metronicTheme.colors.gray300}`,
+            borderRadius: '10px',
+            fontSize: '14px',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            color: metronicTheme.colors.gray700,
+            fontWeight: '500'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = metronicTheme.colors.gray100;
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = metronicTheme.colors.white;
           }}
         >
-          ⚙️
+          <span style={{ fontSize: '16px' }}>⚙️</span>
+          <span>设置</span>
         </button>
       </div>
 
@@ -156,77 +204,124 @@ export function MessagePane({
       <div style={{
         flex: 1,
         overflow: 'auto',
-        padding: '20px',
+        padding: '24px',
         display: 'flex',
         flexDirection: 'column',
-        gap: '16px'
+        gap: '16px',
+        background: metronicTheme.colors.gray100
       }}>
         {messages.length === 0 ? (
           <div style={{
             textAlign: 'center',
-            color: '#808080',
-            padding: '40px 20px'
+            color: metronicTheme.colors.gray600,
+            padding: '60px 20px'
           }}>
-            <div style={{ fontSize: '48px', marginBottom: '16px' }}>📱</div>
-            <p style={{ fontSize: '14px', margin: 0 }}>
+            <div style={{
+              fontSize: '64px',
+              marginBottom: '20px',
+              opacity: 0.5
+            }}>📱</div>
+            <p style={{
+              fontSize: '15px',
+              margin: 0,
+              lineHeight: '1.6'
+            }}>
               还没有消息记录
               <br />
               发送第一条消息开始对话
             </p>
           </div>
         ) : (
-          messages.map((m, i) => (
-            <div
-              key={i}
-              style={{
-                display: 'flex',
-                justifyContent: m.from === 'me' ? 'flex-end' : 'flex-start',
-                marginBottom: '8px'
-              }}
-            >
-              <div style={{
-                maxWidth: '70%',
-                background: m.from === 'me' ? 
-                  'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 
-                  'rgba(255, 255, 255, 0.1)',
-                color: '#ffffff',
-                padding: '12px 16px',
-                borderRadius: '18px',
-                borderBottomRightRadius: m.from === 'me' ? '6px' : '18px',
-                borderBottomLeftRadius: m.from === 'me' ? '18px' : '6px',
-                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)',
-                position: 'relative'
-              }}>
+          messages.map((m, i) => {
+            const channelInfo = getChannelIcon(m.channel);
+            return (
+              <div
+                key={i}
+                style={{
+                  display: 'flex',
+                  justifyContent: m.from === 'me' ? 'flex-end' : 'flex-start',
+                  marginBottom: '8px'
+                }}
+              >
                 <div style={{
-                  fontSize: '14px',
-                  lineHeight: '1.4',
-                  wordBreak: 'break-word'
+                  maxWidth: '70%',
+                  background: m.from === 'me' ?
+                    `linear-gradient(135deg, ${metronicTheme.colors.primary} 0%, ${metronicTheme.colors.info} 100%)` :
+                    metronicTheme.colors.white,
+                  color: m.from === 'me' ? metronicTheme.colors.white : metronicTheme.colors.gray900,
+                  padding: '14px 18px',
+                  borderRadius: '16px',
+                  borderBottomRightRadius: m.from === 'me' ? '4px' : '16px',
+                  borderBottomLeftRadius: m.from === 'me' ? '16px' : '4px',
+                  boxShadow: m.from === 'me' ?
+                    `0 4px 12px ${metronicTheme.colors.primary}30` :
+                    '0 2px 8px rgba(0, 0, 0, 0.08)',
+                  position: 'relative',
+                  border: m.from === 'me' ? 'none' : `1px solid ${metronicTheme.colors.gray200}`
                 }}>
-                  {m.text}
-                </div>
-                <div style={{
-                  fontSize: '11px',
-                  color: m.from === 'me' ? 'rgba(255, 255, 255, 0.7)' : '#b3b3b3',
-                  marginTop: '4px',
-                  textAlign: 'right'
-                }}>
-                  {formatTime(m.ts)}
-                  {m.from === 'me' && (
-                    <span style={{ marginLeft: '4px' }}>✓</span>
+                  {/* 频道标识（仅显示在接收的消息上） */}
+                  {m.from !== 'me' && m.channel && (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      marginBottom: '10px',
+                      paddingBottom: '10px',
+                      borderBottom: `1px solid ${metronicTheme.colors.gray200}`
+                    }}>
+                      <span style={{
+                        width: '20px',
+                        height: '20px',
+                        borderRadius: '50%',
+                        background: channelInfo.color,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '12px'
+                      }}>
+                        {channelInfo.icon}
+                      </span>
+                      <span style={{
+                        fontSize: '11px',
+                        color: metronicTheme.colors.gray600,
+                        fontWeight: '600'
+                      }}>
+                        来自 {channelInfo.name}
+                      </span>
+                    </div>
                   )}
+                  <div style={{
+                    fontSize: '14px',
+                    lineHeight: '1.5',
+                    wordBreak: 'break-word'
+                  }}>
+                    {m.text}
+                  </div>
+                  <div style={{
+                    fontSize: '11px',
+                    color: m.from === 'me' ? 'rgba(255, 255, 255, 0.8)' : metronicTheme.colors.gray500,
+                    marginTop: '6px',
+                    textAlign: 'right',
+                    fontWeight: '500'
+                  }}>
+                    {formatTime(m.ts)}
+                    {m.from === 'me' && (
+                      <span style={{ marginLeft: '6px', fontSize: '14px' }}>✓</span>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
         <div ref={messagesEndRef} />
       </div>
 
       {/* 输入区域 */}
       <div style={{
-        padding: '16px 20px',
-        borderTop: '1px solid rgba(255, 255, 255, 0.1)',
-        background: 'rgba(255, 255, 255, 0.05)'
+        padding: '20px 24px',
+        borderTop: `1px solid ${metronicTheme.colors.gray200}`,
+        background: metronicTheme.colors.white
       }}>
         <form onSubmit={handleSubmit} style={{
           display: 'flex',
@@ -235,9 +330,8 @@ export function MessagePane({
         }}>
           <div style={{ flex: 1, position: 'relative' }}>
             <textarea
-              className="input"
-              placeholder={connectionStatus === 'connected' ? 
-                "输入消息..." : 
+              placeholder={connectionStatus === 'connected' ?
+                "输入消息..." :
                 "等待连接..."}
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
@@ -249,23 +343,47 @@ export function MessagePane({
                 }
               }}
               style={{
+                width: '100%',
                 resize: 'none',
-                minHeight: '44px',
+                minHeight: '48px',
                 maxHeight: '120px',
-                paddingRight: '50px'
+                padding: '12px 50px 12px 16px',
+                border: `1px solid ${metronicTheme.colors.gray300}`,
+                borderRadius: '12px',
+                fontSize: '14px',
+                fontFamily: metronicTheme.fonts.family,
+                color: metronicTheme.colors.gray900,
+                background: metronicTheme.colors.gray100,
+                outline: 'none',
+                transition: 'all 0.2s ease'
               }}
               rows={1}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = metronicTheme.colors.primary;
+                e.currentTarget.style.background = metronicTheme.colors.white;
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = metronicTheme.colors.gray300;
+                e.currentTarget.style.background = metronicTheme.colors.gray100;
+              }}
             />
             <button
               type="button"
               style={{
                 position: 'absolute',
                 right: '12px',
-                bottom: '12px',
+                bottom: '14px',
                 background: 'none',
                 border: 'none',
                 fontSize: '20px',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                transition: 'transform 0.2s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'scale(1.2)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'scale(1)';
               }}
             >
               😊
@@ -273,17 +391,36 @@ export function MessagePane({
           </div>
           <button
             type="submit"
-            className="btn btn-primary"
             disabled={!inputText.trim() || connectionStatus !== 'connected'}
             style={{
-              height: '44px',
-              width: '44px',
+              height: '48px',
+              width: '48px',
               borderRadius: '50%',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: '18px',
-              padding: 0
+              fontSize: '20px',
+              padding: 0,
+              background: !inputText.trim() || connectionStatus !== 'connected' ?
+                metronicTheme.colors.gray300 :
+                `linear-gradient(135deg, ${metronicTheme.colors.primary} 0%, ${metronicTheme.colors.info} 100%)`,
+              color: metronicTheme.colors.white,
+              border: 'none',
+              cursor: !inputText.trim() || connectionStatus !== 'connected' ? 'not-allowed' : 'pointer',
+              transition: 'all 0.3s ease',
+              boxShadow: !inputText.trim() || connectionStatus !== 'connected' ?
+                'none' :
+                `0 4px 12px ${metronicTheme.colors.primary}30`
+            }}
+            onMouseEnter={(e) => {
+              if (inputText.trim() && connectionStatus === 'connected') {
+                e.currentTarget.style.transform = 'translateY(-2px) scale(1.05)';
+                e.currentTarget.style.boxShadow = `0 6px 16px ${metronicTheme.colors.primary}40`;
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translateY(0) scale(1)';
+              e.currentTarget.style.boxShadow = `0 4px 12px ${metronicTheme.colors.primary}30`;
             }}
           >
             ➤
@@ -291,9 +428,10 @@ export function MessagePane({
         </form>
         <div style={{
           fontSize: '12px',
-          color: '#808080',
-          marginTop: '8px',
-          textAlign: 'center'
+          color: metronicTheme.colors.gray500,
+          marginTop: '12px',
+          textAlign: 'center',
+          fontWeight: '500'
         }}>
           按 Enter 发送，Shift + Enter 换行
         </div>

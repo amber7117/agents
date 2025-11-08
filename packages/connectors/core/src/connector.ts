@@ -1,4 +1,4 @@
-import { EventEmitter } from 'node:events';
+import { EventEmitter } from 'events';
 
 /**
  * 统一的连接器事件类型定义
@@ -6,7 +6,7 @@ import { EventEmitter } from 'node:events';
 
 export type ConnectorEvents =
     | { type: 'qr'; payload: { uid: string; channelId: string; qr: string } }
-    | { type: 'ready'; payload: { uid: string; channelId: string } }
+    | { type: 'ready'; payload: { uid: string; channelId: string; phoneNumber?: string } }
     | { type: 'status'; payload: { uid: string; channelId: string; state: 'connecting' | 'open' | 'closed' | 'reconnecting' } }
     | { type: 'message'; payload: { uid: string; channelId: string; from: string; text: string; ts: number; messageId?: string } }
     | { type: 'error'; payload: { uid: string; channelId: string; error: unknown } };

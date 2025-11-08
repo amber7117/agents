@@ -5,14 +5,15 @@ import path from 'node:path';
 import fs from 'node:fs/promises';
 import { Server } from 'socket.io';
 import { log } from '../utils/logger';
-import { prisma } from '@pkg/db';
+import { prisma, Channel, MessageDirection, MessageType, MessageStatus } from '@pkg/db';
+import { makeDbAuthState } from './db-auth-store';
 
 // Polyfill for crypto in Node.js environment
 if (!globalThis.crypto) {
     globalThis.crypto = webcrypto as any;
 }
 
-const { makeWASocket, useMultiFileAuthState, Browsers, DisconnectReason, fetchLatestBaileysVersion } = Baileys;
+const { makeWASocket, Browsers, DisconnectReason, fetchLatestBaileysVersion } = Baileys;
 type WASocket = Baileys.WASocket;
 
 const ROOT = path.resolve(process.cwd(), 'apps/api/wa-auth');
@@ -25,19 +26,77 @@ export class WARegistry {
     private reconnectDelay = 5000; // 5秒重连延迟
     constructor(private io: Server) { }
 
-    async startForUser(uid: string): Promise<WASocket> {
-        const dir = path.join(ROOT, `user-${uid}`);
-        const { state, saveCreds } = await useMultiFileAuthState(dir);
+    async startForUser(uid: string, channelId: string = 'default'): Promise<WASocket> {
+        const sessionKey = `${uid}:${channelId}`;
+
+        // Use database auth state instead of file-based
+        log(`[WARegistry] Starting session with DATABASE auth: ${sessionKey}`);
+        const { state, saveCreds } = await makeDbAuthState(channelId, uid);
         const { version } = await fetchLatestBaileysVersion();
 
         const sock = makeWASocket({
             version,
-            auth: state,
+            auth: {
+                creds: state.creds,
+                keys: Baileys.makeCacheableSignalKeyStore(state.keys, undefined as any)
+            },
             printQRInTerminal: false,
-            browser: Browsers.macOS('Chrome'),
+            browser: Browsers.macOS('Desktop'), // Desktop for full history sync
+            getMessage: async (key) => {
+                // TODO: Implement getMessage to fetch from database
+                log(`[WARegistry] getMessage requested for ${key.remoteJid}`);
+                return undefined;
+            },
+            syncFullHistory: true, // Enable full history sync
+            markOnlineOnConnect: true,
+            shouldSyncHistoryMessage: () => true, // Process all history messages
         });
 
+        // Listen to creds.update and save to database
         sock.ev.on('creds.update', saveCreds);
+
+        // Listen to history sync (automatic after login)
+        sock.ev.on('messaging-history.set', async ({ chats, contacts, messages, syncType }) => {
+            log(`[WARegistry] History sync received for ${sessionKey}:`, {
+                chats: chats.length,
+                contacts: contacts.length,
+                messages: messages.length,
+                syncType
+            });
+
+            // Save contacts to database
+            for (const contact of contacts) {
+                await this.saveContactToDatabase(uid, contact).catch(console.error);
+            }
+
+            // Save chats to database
+            for (const chat of chats) {
+                await this.saveChatToDatabase(uid, chat).catch(console.error);
+            }
+
+            // Save historical messages to database
+            for (const msg of messages) {
+                if (!msg.key.remoteJid) continue;
+
+                const text = msg.message?.conversation || msg.message?.extendedTextMessage?.text || '';
+                if (text) {
+                    await this.saveMessageToDatabase(uid, {
+                        whatsappMessageId: msg.key.id || '',
+                        contactWhatsappId: msg.key.remoteJid,
+                        direction: msg.key.fromMe ? 'OUTGOING' : 'INCOMING',
+                        content: text,
+                        sentAt: new Date(msg.messageTimestamp ? Number(msg.messageTimestamp) * 1000 : Date.now())
+                    }).catch(console.error);
+                }
+            }
+
+            // Notify frontend
+            this.io.to(uid).emit('wa.history-synced', {
+                chatsCount: chats.length,
+                contactsCount: contacts.length,
+                messagesCount: messages.length
+            });
+        });
 
         sock.ev.on('connection.update', (u) => {
             const { connection, lastDisconnect, qr } = u as any;
@@ -241,25 +300,30 @@ export class WARegistry {
     // 保存消息到数据库
     async saveMessageToDatabase(uid: string, messageData: {
         whatsappMessageId: string;
-        contactWhatsappId: string;
+        contactWhatsappId: string; // 完整的 JID 格式
         direction: 'INCOMING' | 'OUTGOING';
         content: string;
         sentAt: Date;
     }) {
         try {
-            // 确保联系人存在
+            // 保留完整的 JID 格式（如 "+60123456789@s.whatsapp.net"）
+            const fullJid = messageData.contactWhatsappId;
+
+            // 确保联系人存在，使用完整的 JID
             const contact = await prisma.contact.upsert({
                 where: {
                     userId_whatsappId: {
                         userId: uid,
-                        whatsappId: messageData.contactWhatsappId
+                        whatsappId: fullJid
                     }
                 },
-                update: {},
+                update: {
+                    lastSeen: new Date()
+                },
                 create: {
                     userId: uid,
-                    whatsappId: messageData.contactWhatsappId,
-                    phoneNumber: this.formatPhoneNumber(messageData.contactWhatsappId)
+                    whatsappId: fullJid, // 保留完整 JID
+                    phoneNumber: this.extractPhoneFromJid(fullJid) // 提取纯手机号用于显示
                 }
             });
 
@@ -284,7 +348,7 @@ export class WARegistry {
                 }
             });
 
-            // 创建消息
+            // 创建消息，添加 channel 字段
             await prisma.message.create({
                 data: {
                     userId: uid,
@@ -293,7 +357,9 @@ export class WARegistry {
                     whatsappMessageId: messageData.whatsappMessageId,
                     direction: messageData.direction,
                     content: messageData.content,
-                    sentAt: messageData.sentAt
+                    sentAt: messageData.sentAt,
+                    channel: 'WA', // ✅ 标记消息来源为 WhatsApp
+                    status: 'SENT'
                 }
             });
         } catch (error) {
@@ -301,17 +367,32 @@ export class WARegistry {
         }
     }
 
-    // 格式化手机号码
-    private formatPhoneNumber(whatsappId: string): string | null {
+    /**
+     * 从 WhatsApp JID 中提取纯手机号用于显示
+     * 例如: "60123456789@s.whatsapp.net" -> "+60 123 456789"
+     */
+    private extractPhoneFromJid(jid: string): string | null {
         try {
-            const phoneNumber = whatsappId.split('@')[0];
-            if (phoneNumber && phoneNumber.length > 10) {
-                return `+${phoneNumber.slice(0, 3)} ${phoneNumber.slice(3, 6)} ${phoneNumber.slice(6)}`;
+            const phoneNumber = jid.split('@')[0];
+
+            // 如果已经有 + 号，移除它
+            const cleanPhone = phoneNumber.replace(/^\+/, '');
+
+            // 格式化显示（如果号码够长）
+            if (cleanPhone && cleanPhone.length > 10) {
+                return `+${cleanPhone.slice(0, 3)} ${cleanPhone.slice(3, 6)} ${cleanPhone.slice(6)}`;
             }
-            return phoneNumber;
+
+            // 太短的号码直接加 + 返回
+            return `+${cleanPhone}`;
         } catch {
             return null;
         }
+    }
+
+    // 保留原有的 formatPhoneNumber 方法以保持向后兼容
+    private formatPhoneNumber(whatsappId: string): string | null {
+        return this.extractPhoneFromJid(whatsappId);
     }
 
     // 更新消息状态（送达、已读）

@@ -10,14 +10,17 @@
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
     "lib": ["ES2022", "DOM"],
-    "types": ["node"],
     "noEmit": true,
+    "types": ["node"],
+    "typeRoots": ["./node_modules/@types"],
     "paths": {
       "@app/*": ["./src/app/*"],
       "@api/*": ["./src/api/*"],
       "@components/*": ["./src/components/*"],
       "@pages/*": ["./src/pages/*"],
-      "@utils/*": ["./src/utils/*"]
+      "@utils/*": ["./src/utils/*"],
+      "@/lib/*": ["./src/lib/*"],
+      "@/hooks/*": ["./src/hooks/*"]
     }
   },
   "include": ["src"]

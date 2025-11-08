@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { api } from '../api';
 import { useNavigate } from 'react-router-dom';
+import { Button } from '../components/ui/button';
 
 export default function Register() {
   const [formData, setFormData] = useState({
@@ -23,7 +24,6 @@ export default function Register() {
   });
   const nav = useNavigate();
 
-  // 表单验证
   useEffect(() => {
     setValidations({
       email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email),
@@ -35,7 +35,7 @@ export default function Register() {
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    setMsg(''); // 清除错误消息
+    setMsg('');
   };
 
   const getPasswordStrength = (password: string) => {
@@ -50,9 +50,9 @@ export default function Register() {
   };
 
   const getStrengthColor = (strength: number) => {
-    if (strength <= 2) return '#ff9a9e';
-    if (strength <= 4) return '#ffecd2';
-    return '#4facfe';
+    if (strength <= 2) return 'text-red-500';
+    if (strength <= 4) return 'text-yellow-500';
+    return 'text-green-500';
   };
 
   const getStrengthText = (strength: number) => {
@@ -63,8 +63,7 @@ export default function Register() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // 验证所有字段
+
     if (!validations.email) {
       setMsg('请输入有效的邮箱地址');
       return;
@@ -105,72 +104,31 @@ export default function Register() {
   const passwordStrength = getPasswordStrength(formData.password);
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '20px'
-    }}>
-      <div className="card" style={{
-        width: '100%',
-        maxWidth: '480px',
-        background: 'rgba(255, 255, 255, 0.08)',
-        backdropFilter: 'blur(20px)',
-        border: '1px solid rgba(255, 255, 255, 0.2)'
-      }}>
-        {/* Logo 和标题 */}
-        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-          <div style={{
-            width: '80px',
-            height: '80px',
-            background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-            borderRadius: '20px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '40px',
-            margin: '0 auto 16px',
-            boxShadow: '0 8px 24px rgba(240, 147, 251, 0.3)'
-          }}>
-            🚀
+    <div className="auth-page">
+      <div className="card auth-form" style={{ maxWidth: '480px' }}>
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-pink-500 to-purple-600 rounded-2xl shadow-xl mb-4">
+            <span className="text-5xl">🚀</span>
           </div>
-          <h1 style={{
-            fontSize: '28px',
-            fontWeight: '700',
-            margin: '0 0 8px',
-            background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-            backgroundClip: 'text',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent'
-          }}>
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-pink-500 to-purple-600 bg-clip-text text-transparent mb-2">
             创建账户
           </h1>
-          <p style={{
-            color: '#b3b3b3',
-            fontSize: '16px',
-            margin: 0
-          }}>
+          <p className="text-gray-500 dark:text-gray-400">
             开始您的 WhatsApp 业务之旅
           </p>
         </div>
 
-        {/* 注册表单 */}
-        <form className="form" onSubmit={handleSubmit}>
-          {/* 姓名字段 */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
             <div className="form-group">
               <label className="form-label">姓名 *</label>
               <input
-                className="input"
+                className={`input ${formData.firstName && !validations.firstName ? 'border-red-500' : ''}`}
                 type="text"
                 placeholder="姓"
                 value={formData.firstName}
                 onChange={(e) => handleInputChange('firstName', e.target.value)}
                 disabled={isLoading}
-                style={{
-                  borderColor: formData.firstName && !validations.firstName ? '#ff9a9e' : undefined
-                }}
               />
             </div>
             <div className="form-group">
@@ -186,29 +144,25 @@ export default function Register() {
             </div>
           </div>
 
-          {/* 邮箱字段 */}
           <div className="form-group">
             <label className="form-label">邮箱地址 *</label>
             <input
-              className="input"
+              className={`input ${formData.email && !validations.email ? 'border-red-500' :
+                  validations.email ? 'border-green-500' : ''
+                }`}
               type="email"
               placeholder="your@email.com"
               value={formData.email}
               onChange={(e) => handleInputChange('email', e.target.value)}
               disabled={isLoading}
-              style={{
-                borderColor: formData.email && !validations.email ? '#ff9a9e' : 
-                           validations.email ? '#4facfe' : undefined
-              }}
             />
             {formData.email && validations.email && (
-              <div style={{ color: '#4facfe', fontSize: '12px', marginTop: '4px' }}>
+              <div className="text-green-500 text-xs mt-1">
                 ✅ 邮箱格式正确
               </div>
             )}
           </div>
 
-          {/* 手机号字段 */}
           <div className="form-group">
             <label className="form-label">手机号码</label>
             <input
@@ -221,196 +175,135 @@ export default function Register() {
             />
           </div>
 
-          {/* 密码字段 */}
           <div className="form-group">
             <label className="form-label">密码 *</label>
-            <div style={{ position: 'relative' }}>
+            <div className="relative">
               <input
-                className="input"
+                className={`input pr-12 ${formData.password && !validations.password ? 'border-red-500' : ''}`}
                 type={showPassword ? 'text' : 'password'}
                 placeholder="至少6个字符"
                 value={formData.password}
                 onChange={(e) => handleInputChange('password', e.target.value)}
                 disabled={isLoading}
-                style={{
-                  paddingRight: '48px',
-                  borderColor: formData.password && !validations.password ? '#ff9a9e' : undefined
-                }}
               />
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon"
                 onClick={() => setShowPassword(!showPassword)}
-                style={{
-                  position: 'absolute',
-                  right: '12px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  background: 'none',
-                  border: 'none',
-                  color: '#b3b3b3',
-                  cursor: 'pointer',
-                  fontSize: '18px'
-                }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
               >
                 {showPassword ? '🙈' : '👁️'}
-              </button>
+              </Button>
             </div>
-            
-            {/* 密码强度指示器 */}
+
             {formData.password && (
-              <div style={{ marginTop: '8px' }}>
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginBottom: '4px'
-                }}>
-                  <span style={{ fontSize: '12px', color: '#b3b3b3' }}>密码强度</span>
-                  <span style={{
-                    fontSize: '12px',
-                    color: getStrengthColor(passwordStrength),
-                    fontWeight: '600'
-                  }}>
+              <div className="mt-2">
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-xs text-gray-500 dark:text-gray-400">密码强度</span>
+                  <span className={`text-xs font-semibold ${getStrengthColor(passwordStrength)}`}>
                     {getStrengthText(passwordStrength)}
                   </span>
                 </div>
-                <div style={{
-                  width: '100%',
-                  height: '4px',
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  borderRadius: '2px',
-                  overflow: 'hidden'
-                }}>
-                  <div style={{
-                    width: `${(passwordStrength / 6) * 100}%`,
-                    height: '100%',
-                    background: getStrengthColor(passwordStrength),
-                    transition: 'all 0.3s ease'
-                  }}></div>
+                <div className="w-full h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full transition-all duration-300 ${passwordStrength <= 2 ? 'bg-red-500' :
+                        passwordStrength <= 4 ? 'bg-yellow-500' : 'bg-green-500'
+                      }`}
+                    style={{ width: `${(passwordStrength / 6) * 100}%` }}
+                  ></div>
                 </div>
               </div>
             )}
           </div>
 
-          {/* 确认密码字段 */}
           <div className="form-group">
             <label className="form-label">确认密码 *</label>
-            <div style={{ position: 'relative' }}>
+            <div className="relative">
               <input
-                className="input"
+                className={`input pr-12 ${formData.confirmPassword && !validations.confirmPassword ? 'border-red-500' :
+                    validations.confirmPassword ? 'border-green-500' : ''
+                  }`}
                 type={showConfirmPassword ? 'text' : 'password'}
                 placeholder="再次输入密码"
                 value={formData.confirmPassword}
                 onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
                 disabled={isLoading}
-                style={{
-                  paddingRight: '48px',
-                  borderColor: formData.confirmPassword && !validations.confirmPassword ? '#ff9a9e' : 
-                             validations.confirmPassword ? '#4facfe' : undefined
-                }}
               />
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon"
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                style={{
-                  position: 'absolute',
-                  right: '12px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  background: 'none',
-                  border: 'none',
-                  color: '#b3b3b3',
-                  cursor: 'pointer',
-                  fontSize: '18px'
-                }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
               >
                 {showConfirmPassword ? '🙈' : '👁️'}
-              </button>
+              </Button>
             </div>
             {formData.confirmPassword && validations.confirmPassword && (
-              <div style={{ color: '#4facfe', fontSize: '12px', marginTop: '4px' }}>
+              <div className="text-green-500 text-xs mt-1">
                 ✅ 密码匹配
               </div>
             )}
           </div>
 
           {msg && (
-            <div className={`message ${msg.includes('成功') ? 'message-success' : 'message-error'}`}>
+            <div className={`p-3 rounded-lg text-sm font-medium ${msg.includes('成功')
+                ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800'
+                : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800'
+              }`}>
               {msg}
             </div>
           )}
 
-          <button
+          <Button
             type="submit"
-            className="btn btn-primary"
             disabled={isLoading || !Object.values(validations).every(Boolean)}
-            style={{
-              width: '100%',
-              height: '48px',
-              fontSize: '16px',
-              fontWeight: '600',
-              background: Object.values(validations).every(Boolean) ? 
-                'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)' : 
-                'rgba(255, 255, 255, 0.1)'
-            }}
+            className={`w-full h-12 text-base font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] focus:ring-4 ${Object.values(validations).every(Boolean)
+                ? 'bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white focus:ring-pink-500/50'
+                : 'bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed'
+              }`}
           >
             {isLoading ? (
               <>
-                <div className="loading"></div>
+                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
                 创建账户中...
               </>
             ) : (
-              '🚀 创建账户'
+              <>
+                <span className="mr-2">🚀</span>
+                创建账户
+              </>
             )}
-          </button>
+          </Button>
 
-          {/* 分割线 */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '16px',
-            margin: '24px 0'
-          }}>
-            <div style={{ flex: 1, height: '1px', background: 'rgba(255, 255, 255, 0.1)' }}></div>
-            <span style={{ color: '#808080', fontSize: '14px' }}>或</span>
-            <div style={{ flex: 1, height: '1px', background: 'rgba(255, 255, 255, 0.1)' }}></div>
+          <div className="flex items-center gap-4 my-6">
+            <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700"></div>
+            <span className="text-gray-500 dark:text-gray-400 text-sm">或</span>
+            <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700"></div>
           </div>
 
-          {/* 登录链接 */}
-          <div style={{ textAlign: 'center' }}>
-            <span style={{ color: '#b3b3b3', fontSize: '14px' }}>
+          <div className="text-center">
+            <span className="text-gray-600 dark:text-gray-400 text-sm">
               已有账户？{' '}
               <button
                 type="button"
                 onClick={() => nav('/login')}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#f093fb',
-                  cursor: 'pointer',
-                  textDecoration: 'underline',
-                  fontSize: '14px'
-                }}
+                className="text-pink-500 dark:text-pink-400 font-semibold hover:text-pink-600 dark:hover:text-pink-300 transition-colors"
               >
                 立即登录
               </button>
             </span>
           </div>
 
-          {/* 服务条款 */}
-          <div style={{
-            marginTop: '16px',
-            padding: '16px',
-            background: 'rgba(255, 255, 255, 0.03)',
-            borderRadius: '8px',
-            fontSize: '12px',
-            color: '#808080',
-            textAlign: 'center'
-          }}>
+          <div className="mt-4 p-4 bg-gray-50/50 dark:bg-gray-800/50 rounded-lg text-xs text-gray-600 dark:text-gray-400 text-center">
             创建账户即表示您同意我们的{' '}
-            <span style={{ color: '#f093fb', cursor: 'pointer' }}>服务条款</span>{' '}
+            <span className="text-pink-500 dark:text-pink-400 cursor-pointer hover:underline">服务条款</span>{' '}
             和{' '}
-            <span style={{ color: '#f093fb', cursor: 'pointer' }}>隐私政策</span>
+            <span className="text-pink-500 dark:text-pink-400 cursor-pointer hover:underline">隐私政策</span>
           </div>
         </form>
       </div>

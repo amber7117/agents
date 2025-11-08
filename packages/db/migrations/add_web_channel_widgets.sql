@@ -1,0 +1,28 @@
+-- 添加 WEB 渠道到 Channel enum
+-- 注意：Prisma 会自动处理这个迁移
+-- 此文件仅作为参考
+
+-- 添加 Widget 表
+-- CREATE TABLE "widgets" (
+--   "id" TEXT NOT NULL PRIMARY KEY,
+--   "userId" TEXT NOT NULL,
+--   "publicKey" TEXT NOT NULL UNIQUE,
+--   "secret" TEXT NOT NULL,
+--   "allowedOrigins" TEXT NOT NULL,
+--   "name" TEXT,
+--   "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+--   "updatedAt" TIMESTAMP(3) NOT NULL,
+--   FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE
+-- );
+
+-- 添加 VisitorSession 表
+-- CREATE TABLE "visitor_sessions" (
+--   "id" TEXT NOT NULL PRIMARY KEY,
+--   "widgetId" TEXT NOT NULL,
+--   "visitorId" TEXT NOT NULL,
+--   "displayName" TEXT,
+--   "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+--   "updatedAt" TIMESTAMP(3) NOT NULL,
+--   FOREIGN KEY ("widgetId") REFERENCES "widgets"("id") ON DELETE CASCADE,
+--   UNIQUE("widgetId", "visitorId")
+-- );

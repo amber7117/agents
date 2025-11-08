@@ -141,15 +141,24 @@ export async function seedTemplates(): Promise<void> {
     try {
         console.log('[AI Templates] Starting to seed templates...');
 
+        // Check if the model exists in Prisma client
+        if (!('agentTemplate' in prisma) && !('AgentTemplate' in prisma)) {
+            console.error('[AI Templates] Error: agentTemplate model not found in Prisma client. Please check your schema.prisma file.');
+            throw new Error('AgentTemplate model not found. Make sure the model is defined in schema.prisma and run "npx prisma generate"');
+        }
+
+        // Use the correct model name (try both camelCase and PascalCase)
+        const agentTemplateModel = (prisma as any).agentTemplate || (prisma as any).AgentTemplate;
+
         for (const template of TEMPLATES) {
             // Find existing template by name
-            const existingTemplate = await prisma.agentTemplate.findFirst({
+            const existingTemplate = await agentTemplateModel.findFirst({
                 where: { name: template.name },
             });
 
             if (existingTemplate) {
                 // Update existing template
-                await prisma.agentTemplate.update({
+                await agentTemplateModel.update({
                     where: { id: existingTemplate.id },
                     data: {
                         provider: template.provider,
@@ -161,12 +170,12 @@ export async function seedTemplates(): Promise<void> {
                 console.log(`[AI Templates] ✓ Updated: ${template.name}`);
             } else {
                 // Create new template
-                await prisma.agentTemplate.create({
+                await agentTemplateModel.create({
                     data: {
                         name: template.name,
                         provider: template.provider,
                         model: template.model,
-                        prompt: template.systemPrompt, // Changed from systemPrompt to prompt
+                        prompt: template.systemPrompt,
                         createdAt: new Date(),
                         updatedAt: new Date(),
                     },

@@ -40,6 +40,8 @@ export function mountWARoutes(app: Express, io: SocketServer): void {
     router.get('/list', auth, async (req, res) => {
         try {
             const uid = req.user?.id;
+            console.log('📋 [WA Routes] List request from user:', uid);
+
             if (!uid) {
                 return res.status(401).json({ error: 'Unauthorized' });
             }
@@ -54,6 +56,11 @@ export function mountWARoutes(app: Express, io: SocketServer): void {
                 },
             });
 
+            console.log('📊 [WA Routes] Found sessions:', sessions.length);
+            sessions.forEach(s => {
+                console.log(`   - ${s.channelId}: ${s.state}, phone: ${s.phoneNumber}`);
+            });
+
             const wa = getWAChannel();
             const channels = sessions.map(session => ({
                 channelId: session.channelId,
@@ -65,9 +72,10 @@ export function mountWARoutes(app: Express, io: SocketServer): void {
                 createdAt: session.createdAt,
             }));
 
+            console.log('✅ [WA Routes] Returning channels:', channels.length);
             res.json({ channels });
         } catch (err) {
-            console.error('Failed to list WA channels:', err);
+            console.error('❌ [WA Routes] Failed to list WA channels:', err);
             res.status(500).json({
                 error: 'Failed to list channels',
                 message: err instanceof Error ? err.message : String(err),
@@ -234,6 +242,114 @@ export function mountWARoutes(app: Express, io: SocketServer): void {
             console.error('Failed to send WA message:', err);
             res.status(500).json({
                 error: 'Failed to send message',
+                message: err instanceof Error ? err.message : String(err),
+            });
+        }
+    });
+
+    /**
+     * DELETE /channels/wa/chats/:chatId
+     * 删除聊天记录（同时从 WhatsApp 和本地数据库删除）
+     * Params: chatId (WhatsApp JID 或电话号码)
+     */
+    router.delete('/chats/:chatId', auth, async (req, res) => {
+        try {
+            const uid = req.user?.id;
+            if (!uid) {
+                return res.status(401).json({ error: 'Unauthorized' });
+            }
+
+            const { chatId } = req.params;
+            const { channelId = 'default' } = req.query;
+
+            if (!chatId) {
+                return res.status(400).json({
+                    error: 'Missing chat ID',
+                    message: 'Chat ID is required',
+                });
+            }
+
+            const wa = getWAChannel();
+
+            // 检查是否已连接
+            if (!wa.isReady(uid, channelId as string)) {
+                return res.status(400).json({
+                    error: 'Not connected',
+                    message: 'WhatsApp is not connected. Please connect first.',
+                });
+            }
+
+            // 调用 WhatsApp API 删除聊天
+            await wa.deleteChat(uid, channelId as string, chatId);
+
+            // 从数据库删除聊天记录
+            try {
+                await wa.deleteLocalChat(uid, chatId);
+            } catch (dbError) {
+                console.warn('[WA Routes] Failed to delete chat from database:', dbError);
+                // 继续执行，即使数据库删除失败
+            }
+
+            res.json({
+                ok: true,
+                message: 'Chat deleted successfully',
+                chatId,
+            });
+        } catch (err) {
+            console.error('Failed to delete WA chat:', err);
+            res.status(500).json({
+                error: 'Failed to delete chat',
+                message: err instanceof Error ? err.message : String(err),
+            });
+        }
+    });
+
+    /**
+     * POST /channels/wa/chats/:chatId/archive
+     * 归档/取消归档聊天
+     * Params: chatId (WhatsApp JID 或电话号码)
+     * Body: { archive: boolean }
+     */
+    router.post('/chats/:chatId/archive', auth, async (req, res) => {
+        try {
+            const uid = req.user?.id;
+            if (!uid) {
+                return res.status(401).json({ error: 'Unauthorized' });
+            }
+
+            const { chatId } = req.params;
+            const { channelId = 'default', archive = true } = req.body;
+
+            if (!chatId) {
+                return res.status(400).json({
+                    error: 'Missing chat ID',
+                    message: 'Chat ID is required',
+                });
+            }
+
+            const wa = getWAChannel();
+
+            // 检查是否已连接
+            if (!wa.isReady(uid, channelId)) {
+                return res.status(400).json({
+                    error: 'Not connected',
+                    message: 'WhatsApp is not connected. Please connect first.',
+                });
+            }
+
+            // 调用 WhatsApp API 归档聊天
+            await wa.archiveChat(uid, channelId, chatId, archive);
+
+            res.json({
+                ok: true,
+                message: `Chat ${archive ? 'archived' : 'unarchived'} successfully`,
+                chatId,
+                archived: archive,
+            });
+        } catch (err) {
+            console.error(`Failed to ${req.body.archive ? 'archive' : 'unarchive'} WA chat:`, err);
+            res.status(500).json({
+                error: `Failed to ${req.body.archive ? 'archive' : 'unarchive'} chat`,
                 message: err instanceof Error ? err.message : String(err),
             });
         }
